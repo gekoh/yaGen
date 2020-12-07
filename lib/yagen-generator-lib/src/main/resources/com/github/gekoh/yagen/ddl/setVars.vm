@@ -1,9 +1,4 @@
-#set( $is_postgres = ${dialect.getClass().getSimpleName().toLowerCase().contains('postgres')} )
-#set( $is_oracle = ${dialect.getClass().getSimpleName().toLowerCase().contains('oracle')} )
-#set( $is_oracleXE = ${dialect.getClass().getSimpleName().toLowerCase().contains('oraclexe')} )
-
 #if ( $driverClassName )
     #set( $is_hsql = ${driverClassName.toLowerCase().contains('hsql')} )
-#else
-    #set( $is_hsql = ${dialect.getClass().getSimpleName().toLowerCase().contains('hsql')} )
 #end
+##-- debug dialect: oracle: ${is_oracle}, postgres: ${is_postgres}, hsql: ${is_hsql}, oracleXE: ${is_oracleXE}

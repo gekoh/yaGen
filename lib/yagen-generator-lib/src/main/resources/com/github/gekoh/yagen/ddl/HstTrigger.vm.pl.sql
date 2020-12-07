@@ -8,16 +8,15 @@ after insert or update or delete on ${liveTableName}
 for each row
 #end
 declare
+#if($is_postgres)
+  sql_rowcount integer;
+#end
   transaction_timestamp_found timestamp;
   hst_operation HST_MODIFIED_ROW.operation%TYPE:=#if($is_postgres)substr(TG_OP, 1, 1)#{else}case when inserting then 'I'
                                                       when updating then 'U'
                                                       when deleting then 'D' end#{end};
 #if( $is_postgres )
-  live_rowid ${varcharType}:=''
-    #foreach( $pkColumn in $pkColumns )
-        ||case when hst_operation<>'D' then ${new}.${pkColumn} else ${old}.${pkColumn} end
-    #end
-    ;
+  live_rowid tid:=case when hst_operation in ('U', 'I') then ${new}.ctid else ${old}.ctid end;
 #else
   live_rowid rowid:=coalesce(${new}.rowid, ${old}.rowid);
 #end
@@ -25,6 +24,11 @@ declare
 #if( $MODIFIER_COLUMN_NAME )  hst_modified_by ${MODIFIER_COLUMN_TYPE}:=substr(get_audit_user(null), 1, ${MODIFIER_COLUMN_NAME_LENGTH});
 #end  hst_table_name ${varcharType}:=upper('${liveTableName}');
 begin
+#if( $bypassFunctionality )
+  if is_bypassed(upper('${objectName}')) = 1 then
+    return#if( $is_postgres ) new#{end};
+  end if;
+#end
 
 #if( !$is_postgres )
   if inserting or deleting
@@ -45,7 +49,7 @@ begin
       from HST_CURRENT_TRANSACTION
       where transaction_id=#if($is_postgres)txid_current()#{else}DBMS_TRANSACTION.LOCAL_TRANSACTION_ID#{end};
     exception when no_data_found then
-      transaction_timestamp_found:=systimestamp;
+      transaction_timestamp_found:=#if($is_postgres)localtimestamp#{else}systimestamp#{end};
       insert into HST_CURRENT_TRANSACTION (transaction_id, transaction_timestamp)
         values (#if($is_postgres)txid_current()#{else}DBMS_TRANSACTION.LOCAL_TRANSACTION_ID#{end}, transaction_timestamp_found);
     end;
@@ -53,11 +57,18 @@ begin
 #if( !$is_postgres )
     if ${new}.rowid<>${old}.rowid then
       update hst_modified_row set row_id=${new}.rowid
-        where #if($is_postgres)transaction_id=txid_current() and #{end}table_name=hst_table_name
+        where table_name=hst_table_name
           and row_id=${old}.rowid;
     end if;
+#else
 
+    if (hst_operation  = 'U') and ${new}.ctid <> ${old}.ctid then
+      update hst_modified_row set row_id=${new}.ctid
+        where transaction_id=txid_current() and table_name=hst_table_name
+          and row_id=${old}.ctid;
+    end if;
 #end
+
     begin
       insert into hst_modified_row values (#if($is_postgres)txid_current(), #{end}hst_table_name, live_rowid, hst_operation, hst_uuid_used);
 
@@ -76,7 +87,13 @@ begin
 #end
             invalidated_at is null;
 
+#if($is_postgres)
+        GET DIAGNOSTICS sql_rowcount = ROW_COUNT;
+        if sql_rowcount<>1 then
+#else
         if sql%rowcount<>1 then
+#end
+#if( $is_postgres )          perform#{end}
           raise_application_error(-20100, 'unable to invalidate history record for '||hst_table_name
 #foreach( $pkColumn in $pkColumns )
               ||' ${pkColumn}='''|| ${old}.${pkColumn} ||''''

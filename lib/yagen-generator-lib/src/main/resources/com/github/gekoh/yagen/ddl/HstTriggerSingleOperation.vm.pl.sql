@@ -25,9 +25,9 @@ begin atomic
 -- which returns binary data and is incompatible with our triggers, thus we specifically use the self created sys_guid
   set hst_uuid_used=public.sys_guid();
   set hst_table_name=upper('${liveTableName}');
-
-if not(is_bypassed('${triggerName}')) then
-
+#if( $bypassFunctionality )
+  if not(is_statically_bypassed('${triggerName}')) and is_bypassed(upper('${triggerName}')) = 0 then
+#end
 #if (${operation} == 'U')
 --/* TRYING to reactivate detection of changes (WAS: need to disable detection of changes, somehow this causes a NPE within HSQLDB, only god knows why)
   if 1=0
@@ -106,5 +106,7 @@ if not(is_bypassed('${triggerName}')) then
 #if (${operation} == 'U')
   end if;
 #end
-end if;
+#if( $bypassFunctionality )
+  end if;
+#end
 end;

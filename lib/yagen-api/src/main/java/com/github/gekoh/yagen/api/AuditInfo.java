@@ -15,12 +15,9 @@
 */
 package com.github.gekoh.yagen.api;
 
-import com.github.gekoh.yagen.hibernate.DateTimeType;
-import org.hibernate.annotations.Type;
-import org.joda.time.DateTime;
-
 import javax.persistence.Column;
 import java.io.Serializable;
+import java.time.LocalDateTime;
 
 /**
  * @author Thomas Spiegl
@@ -37,9 +34,8 @@ public abstract class AuditInfo implements Serializable {
     /**
      * Entity was created at.
      */
-    @Type(type = DateTimeType.TYPE)
     @Column(name = CREATED_AT, nullable = false)
-    private DateTime createdAt;
+    private LocalDateTime createdAt;
 
     /**
      * Entity was created by.
@@ -50,9 +46,8 @@ public abstract class AuditInfo implements Serializable {
     /**
      * Entity was last modified at.
      */
-    @Type(type = DateTimeType.TYPE)
     @Column(name = LAST_MODIFIED_AT)
-    private DateTime lastModifiedAt;
+    private LocalDateTime lastModifiedAt;
 
     /**
      * Entity was last modified by.
@@ -67,7 +62,7 @@ public abstract class AuditInfo implements Serializable {
         this.createdBy = createdBy;
     }
 
-    protected abstract DateTime getCurrentTime();
+    protected abstract LocalDateTime getCurrentTime();
 
     protected abstract String getUserName();
 
@@ -90,7 +85,7 @@ public abstract class AuditInfo implements Serializable {
         this.lastModifiedBy = getUserName();
     }
 
-    public DateTime getCreatedAt() {
+    public LocalDateTime getCreatedAt() {
         return createdAt;
     }
 
@@ -98,7 +93,7 @@ public abstract class AuditInfo implements Serializable {
         return createdBy;
     }
 
-    public DateTime getLastModifiedAt() {
+    public LocalDateTime getLastModifiedAt() {
         return lastModifiedAt;
     }
 

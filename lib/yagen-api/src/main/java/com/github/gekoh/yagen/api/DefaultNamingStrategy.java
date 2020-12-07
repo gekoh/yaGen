@@ -16,7 +16,9 @@
 package com.github.gekoh.yagen.api;
 
 import org.apache.commons.lang.StringUtils;
-import org.hibernate.cfg.EJB3NamingStrategy;
+import org.hibernate.boot.model.naming.Identifier;
+import org.hibernate.engine.jdbc.env.spi.JdbcEnvironment;
+import org.hibernate.internal.util.StringHelper;
 import org.hibernate.mapping.Constraint;
 import org.hibernate.mapping.ForeignKey;
 import org.hibernate.mapping.UniqueKey;
@@ -27,10 +29,39 @@ import java.util.regex.Pattern;
 /**
  * @author Georg Kohlweiss 
  */
-public class DefaultNamingStrategy extends EJB3NamingStrategy implements NamingStrategy {
+public class DefaultNamingStrategy implements NamingStrategy {
     private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(DefaultNamingStrategy.class);
 
     private static final Pattern NONAME_KEY_PATTERN = Pattern.compile("key[0-9]*");
+
+    @Override
+    public Identifier toPhysicalCatalogName(Identifier name, JdbcEnvironment jdbcEnvironment) {
+        return name;
+    }
+
+    @Override
+    public Identifier toPhysicalSchemaName(Identifier name, JdbcEnvironment jdbcEnvironment) {
+        return name;
+    }
+
+    @Override
+    public Identifier toPhysicalTableName(Identifier name, JdbcEnvironment jdbcEnvironment) {
+        return name != null ? Identifier.toIdentifier(tableName(name.getText())) : null;
+    }
+
+    @Override
+    public Identifier toPhysicalSequenceName(Identifier name, JdbcEnvironment jdbcEnvironment) {
+        return name != null ? Identifier.toIdentifier(sequenceName(name.getText())) : null;
+    }
+
+    @Override
+    public Identifier toPhysicalColumnName(Identifier name, JdbcEnvironment jdbcEnvironment) {
+        return name;
+    }
+
+    public String tableName(String tableName) {
+        return tableName;
+    }
 
     @Override
     public String classToTableName(String className) {
@@ -44,7 +75,7 @@ public class DefaultNamingStrategy extends EJB3NamingStrategy implements NamingS
             }
         } catch (ClassNotFoundException ignore) {
         }
-        return super.classToTableName(className);
+        return StringHelper.unqualify( className );
     }
 
     @Override
@@ -74,6 +105,21 @@ public class DefaultNamingStrategy extends EJB3NamingStrategy implements NamingS
         } catch (ClassNotFoundException e) {
             throw new IllegalStateException("cannot get table short name from class " + className, e);
         }
+    }
+
+    public String columnName(String columnName) {
+        return columnName;
+    }
+
+    public String collectionTableName(String ownerEntity, String ownerEntityTable, String associatedEntity, String associatedEntityTable, String propertyName) {
+        return tableName(
+                new StringBuilder( ownerEntityTable ).append( "_" )
+                        .append(
+                                associatedEntityTable != null ?
+                                        associatedEntityTable :
+                                        StringHelper.unqualify( propertyName )
+                        ).toString()
+        );
     }
 
     @Override

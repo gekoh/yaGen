@@ -30,7 +30,7 @@ public class PatchHibernateMappingClasses {
 
     public static void applyPatch() throws Exception {
         if (!isAlreadyPatched()) {
-            if (alreadyLoaded("org.hibernate.cfg.Configuration$MappingsImpl")) {
+            if (alreadyLoaded(PatchTransformer.PATCH_CLASS_LIST.get(0))) {
                 throw new HibernateClassesAlreadyLoadedException();
             }
             ClassPool cp = ClassPool.getDefault();

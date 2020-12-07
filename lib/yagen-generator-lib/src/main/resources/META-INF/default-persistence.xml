@@ -19,7 +19,6 @@
     <persistence-unit name="oracle" transaction-type="RESOURCE_LOCAL">
 
         <provider>org.hibernate.jpa.HibernatePersistenceProvider</provider>
-        <mapping-file>META-INF/oracleDataTypes.hbm.xml</mapping-file>
         <exclude-unlisted-classes>true</exclude-unlisted-classes>
 
         <properties>
@@ -32,7 +31,6 @@
     <persistence-unit name="oracleXE" transaction-type="RESOURCE_LOCAL">
 
         <provider>org.hibernate.jpa.HibernatePersistenceProvider</provider>
-        <mapping-file>META-INF/oracleDataTypes.hbm.xml</mapping-file>
         <exclude-unlisted-classes>true</exclude-unlisted-classes>
 
         <properties>

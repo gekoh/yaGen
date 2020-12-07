@@ -17,23 +17,27 @@ package com.github.gekoh.yagen.ddl;
 
 import com.github.gekoh.yagen.api.DefaultNamingStrategy;
 import com.github.gekoh.yagen.api.NamingStrategy;
+import com.github.gekoh.yagen.api.TemporalEntity;
 import com.github.gekoh.yagen.hibernate.PatchGlue;
-import com.github.gekoh.yagen.hibernate.PatchHibernateMappingClasses;
 import com.github.gekoh.yagen.util.DBHelper;
 import org.apache.commons.lang.StringUtils;
 import org.apache.velocity.VelocityContext;
 import org.apache.velocity.app.Velocity;
 import org.dom4j.Document;
-import org.dom4j.DocumentException;
-import org.dom4j.Element;
-import org.dom4j.Node;
-import org.dom4j.io.DOMWriter;
 import org.dom4j.io.SAXReader;
-import org.hibernate.cfg.Configuration;
+import org.hibernate.boot.Metadata;
+import org.hibernate.boot.MetadataSources;
+import org.hibernate.boot.registry.StandardServiceRegistryBuilder;
 import org.hibernate.dialect.Dialect;
+import org.hibernate.mapping.PersistentClass;
+import org.hibernate.service.ServiceRegistry;
 import org.hibernate.tool.hbm2ddl.SchemaExport;
-import org.joda.time.DateTime;
+import org.hibernate.tool.schema.TargetType;
 
+import javax.persistence.EntityManagerFactory;
+import javax.persistence.MappedSuperclass;
+import javax.persistence.Persistence;
+import javax.persistence.metamodel.EntityType;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -42,19 +46,23 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.io.StringWriter;
-import java.lang.reflect.Method;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 import java.util.Set;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+
+import static com.github.gekoh.yagen.ddl.CoreDDLGenerator.PERSISTENCE_UNIT_PROPERTY_PROFILE_PROVIDER_CLASS;
 
 /**
  * @author Georg Kohlweiss
@@ -63,114 +71,84 @@ public class DDLGenerator {
     private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(DDLGenerator.class);
 
     public void writeDDL (Profile profile) {
-        SchemaExport export = new SchemaExportFactory().createSchemaExport(profile);
+        SchemaExport export = new SchemaExport();
         export.setDelimiter(";");
         export.setFormat(true);
         export.setOutputFile(profile.getOutputFile());
-        export.execute(true, false, false, true);
+        Metadata metadata = new SchemaExportHelper(profile.getPersistenceUnitName()).createSchemaExportMetadata();
+        PatchGlue.initDialect(profile, metadata);
+        export.createOnly(EnumSet.of(TargetType.SCRIPT), metadata);
 
         LOG.info("schema script written to file {}", profile.getOutputFile());
     }
 
-    public static class SchemaExportFactory {
+    public static class SchemaExportHelper {
 
-        private Configuration cfg;
+        private String persistenceUnitName;
 
-        public SchemaExport createSchemaExport (Profile profile) {
-            if (StringUtils.isNotEmpty(profile.getPersistenceUnitName())) {
-//            need to patch the class NumericBooleanType only for oracle until all applications have
-//            upgraded hibernate to 3.6.10-Final and the type specifications @Type(type = "org.hibernate.type.NumericBooleanType")
-//            are replaced back to @Type(type = "numeric_boolean")
-                if (profile.getPersistenceUnitName().contains("oracle")) {
-                    try {
-                        PatchHibernateMappingClasses.patchNumericBooleanTypeForOracle();
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                    }
+        public SchemaExportHelper(String persistenceUnitName) {
+            this.persistenceUnitName = persistenceUnitName;
+        }
+
+        public Metadata createSchemaExportMetadata() {
+
+            EntityManagerFactory entityManagerFactory = Persistence.createEntityManagerFactory(persistenceUnitName);
+
+            ServiceRegistry serviceRegistry =
+                new StandardServiceRegistryBuilder()
+                        .applySettings(entityManagerFactory.getProperties())
+                    .build();
+
+            MetadataSources sources = new MetadataSources(serviceRegistry);
+
+            for (EntityType entityType : entityManagerFactory.getMetamodel().getEntities()) {
+                sources.addAnnotatedClass(entityType.getJavaType());
+            }
+
+            return sources.getMetadataBuilder().build();
+        }
+
+        public Collection<Class> getEntityAndMappedSuperClasses() {
+            return DDLGenerator.getEntityAndMappedSuperClassesFrom(createSchemaExportMetadata());
+        }
+    }
+
+    public static Map getConfigurationValues(String persistenceUnit) {
+        return DBHelper.getConfigurationValues(new SchemaExportHelper(persistenceUnit).createSchemaExportMetadata());
+    }
+
+    public static Collection<Class> getEntityAndMappedSuperClassesFrom(Metadata metadata) {
+        List<Class> entityClasses = metadata.getEntityBindings().stream().map(PersistentClass::getMappedClass).collect(Collectors.toList());
+        Set<Class> allClasses = new HashSet<>(entityClasses);
+        for (Class entityClass : entityClasses) {
+            Class superClass = entityClass;
+            while ((superClass = superClass.getSuperclass()) != null) {
+                if (superClass.isAnnotationPresent(MappedSuperclass.class)) {
+                    allClasses.add(superClass);
                 }
+            }
+        }
 
-                createConfiguration(profile);
+        return allClasses;
+    }
+
+    public static Profile createProfile(String profileName, String persistenceUnit) {
+        return createProfileFromMetadata(profileName, new SchemaExportHelper(persistenceUnit).createSchemaExportMetadata());
+    }
+
+    public static Profile createProfileFromMetadata(String profileName, Metadata metadata) {
+        Map configurationValues = DBHelper.getConfigurationValues(metadata);
+        String providerClass = configurationValues != null ? (String) configurationValues.get(PERSISTENCE_UNIT_PROPERTY_PROFILE_PROVIDER_CLASS) : null;
+        try {
+            if (providerClass != null) {
+                return ((ProfileProvider) Class.forName(providerClass).newInstance())
+                        .getProfile(profileName);
             }
             else {
-                cfg = new Configuration();
+                return new Profile(profileName);
             }
-
-            if (cfg == null) {
-                throw new IllegalStateException("unable to obtain hibernate configuration");
-            }
-
-            for (Class entityClass : profile.getEntityClasses()) {
-                if (cfg.getClassMapping(entityClass.getName()) == null) {
-                    cfg.addAnnotatedClass(entityClass);
-                }
-            }
-
-            try {
-                DOMWriter wr = new DOMWriter();
-                for (Document persistenceFile : profile.persistenceFiles) {
-                    cfg.addDocument(wr.write(persistenceFile));
-                    cfg.addProperties(extractProperties(persistenceFile));
-                }
-            } catch (DocumentException e) {
-                LOG.error("cannot set persistence xml file", e);
-            }
-
-            return new SchemaExport(cfg);
-        }
-
-        private void createConfiguration(Profile profile) {
-            try {
-                Class persistenceProviderClass = Class.forName("org.hibernate.jpa.HibernatePersistenceProvider");
-
-                PatchGlue.addConfigurationInterceptor(new PatchGlue.ConfigurationInterceptor() {
-                    public void use(Configuration configuration) {
-                        cfg = configuration;
-                    }
-                });
-
-                try {
-                    Method createEntityManagerFactory = persistenceProviderClass.getMethod("createEntityManagerFactory", String.class, Map.class);
-                    Object provider = persistenceProviderClass.newInstance();
-                    if (createEntityManagerFactory.invoke(provider, new Object[]{profile.getPersistenceUnitName(), null}) == null) {
-                        throw new IllegalArgumentException("persistence unit '" + profile.getPersistenceUnitName() + "' not found");
-                    };
-                } catch (Exception e) {
-                    throw new IllegalStateException("cannot init hibernate", e);
-                }
-
-            } catch (ClassNotFoundException e) {
-
-                try {
-                    Class ejbConfigurationClass = Class.forName("org.hibernate.ejb.Ejb3Configuration");
-                    Method configure = ejbConfigurationClass.getMethod("configure", String.class, Map.class);
-                    Method getHibernateConfiguration = ejbConfigurationClass.getMethod("getHibernateConfiguration");
-
-                    Object ejb3Configuration = ejbConfigurationClass.newInstance();
-                    ejb3Configuration = configure.invoke(ejb3Configuration, new Object[]{profile.getPersistenceUnitName(), null});
-
-                    if (ejb3Configuration == null) {
-                        throw new IllegalArgumentException("cannot find persistence unit " + profile.getPersistenceUnitName());
-                    }
-                    cfg = (Configuration) getHibernateConfiguration.invoke(ejb3Configuration);
-                    // ensure mappings were ready (needed e.g. for hibernate 4.2.7.Final)
-                    cfg.buildMappings();
-                } catch (Exception e1) {
-                    throw new IllegalStateException("cannot detect hibernate version or init failed", e1);
-                }
-            }
-        }
-
-        private Properties extractProperties(Document persistenceFile) {
-            Properties props = new Properties();
-            Element elm;
-
-            if ((elm = persistenceFile.getRootElement().element("persistence-unit")) != null &&
-                    (elm = elm.element("properties")) != null) {
-                for(Element pElm: (Iterable<? extends Element>) elm.elements("property")) {
-                    props.put(pElm.attribute("name").getValue(), pElm.attribute("value").getValue());
-                }
-            }
-            return props;
+        } catch (Exception e) {
+            throw new IllegalStateException(e);
         }
     }
 
@@ -181,7 +159,6 @@ public class DDLGenerator {
         private String name;
         private String outputFile;
         private String persistenceUnitName;
-        private List<Document> persistenceFiles = new ArrayList<Document>();
         private Set<Class> entityClasses = new LinkedHashSet<Class>();
         private List<AddDDLEntry> headerDdls = new ArrayList<AddDDLEntry>();
         private List<AddDDLEntry> addDdls = new ArrayList<AddDDLEntry>();
@@ -191,6 +168,8 @@ public class DDLGenerator {
         private Map<String, Map<String, String>> comments;
         private List<Duplexer> duplexers = new ArrayList<Duplexer>();
         private NamingStrategy namingStrategy;
+
+        private boolean historyInitSet = false;
 
         public static List<Profile> getAllProfiles() {
             return Collections.unmodifiableList(PROFILES);
@@ -209,6 +188,21 @@ public class DDLGenerator {
 
         public String getName() {
             return name;
+        }
+
+        public void registerMetadata(Metadata metadata) {
+            Collection<Class> entitiesFromMetadata = getEntityAndMappedSuperClassesFrom(metadata);
+            entityClasses.addAll(entitiesFromMetadata);
+
+            if (!historyInitSet && !isNoHistory()) {
+                for (Class clazz : entitiesFromMetadata) {
+                    if (clazz.isAnnotationPresent(TemporalEntity.class)) {
+                        addHeaderDdl(new DDLGenerator.AddTemplateDDLEntry(DDLGenerator.class.getResource("/com/github/gekoh/yagen/ddl/InitHistory.ddl.sql")));
+                        historyInitSet = true;
+                        break;
+                    }
+                }
+            }
         }
 
         public void setOutputFile(String outputFile) {
@@ -274,8 +268,16 @@ public class DDLGenerator {
         }
 
         public void addHeaderDdl (AddDDLEntry... entries) {
-            for (AddDDLEntry entry: entries) {
-                headerDdls.add(entry);
+            addHeaderDdl(headerDdls.size(), entries);
+        }
+
+        public void addHeaderDdlOnTop (AddDDLEntry... entries) {
+            addHeaderDdl(0, entries);
+        }
+
+        public void addHeaderDdl (int insertAt, AddDDLEntry... entries) {
+            for (int i=entries.length-1; i>=0; i--) {
+                headerDdls.add(insertAt, entries[i]);
             }
         }
 
@@ -297,44 +299,6 @@ public class DDLGenerator {
             return url;
         }
 
-        public void addPersistenceClass(Class clazz) {
-            entityClasses.add(clazz);
-        }
-
-        public void addPersistenceFile (String... persistenceXmlFile) {
-            for (String file : persistenceXmlFile) {
-                addPersistenceFile(getPersistenceDocument(file));
-            }
-        }
-
-        public void addPersistenceFile (Document persistenceXml) {
-            if (persistenceXml==null) {
-                return;
-            }
-            try {
-                Element pu = persistenceXml.getRootElement().element("persistence-unit");
-                if(pu != null) {
-                    persistenceFiles.add(persistenceXml);
-
-                    for (Object classNode: pu.elements("class")) {
-                        entityClasses.add(Class.forName(((Node) classNode).getText()));
-                    }
-                    for (Object fileNode: pu.elements("mapping-file")) {
-                        addPersistenceFile(getPersistenceDocument(((Node) fileNode).getText()));
-                    }
-                } else {
-                    for(Object entityNode : persistenceXml.getRootElement().elements("mapped-superclass")) {
-                        entityClasses.add(Class.forName((String) ((Element)entityNode).attribute("class").getData()));
-                    }
-                    for(Object entityNode : persistenceXml.getRootElement().elements("entity")) {
-                        entityClasses.add(Class.forName((String) ((Element)entityNode).attribute("class").getData()));
-                    }
-                }
-            } catch (ClassNotFoundException e) {
-                throw new IllegalArgumentException(e);
-            }
-        }
-
         public List<AddDDLEntry> getHeaderDdls() {
             return Collections.unmodifiableList(headerDdls);
         }
@@ -349,13 +313,13 @@ public class DDLGenerator {
             return allDdls;
         }
 
-        public String[] addDdls (String[] stmts, Dialect dialect) {
-            List<String> ddlList = new ArrayList<String>(Arrays.asList(stmts));
 
+        public List<String> getHeaderStatements (Dialect dialect) {
+            List<String> ddlList = new ArrayList<String>();
             int idx = 0;
             StringWriter sw = new StringWriter();
 
-            sw.write("-- auto generated by " + getClass().getName() + " at " + new DateTime()+"\n");
+            sw.write("-- auto generated by " + getClass().getName() + " at " + LocalDateTime.now()+"\n");
             sw.write("-- DO NOT EDIT MANUALLY!");
 
             ddlList.add(idx++, sw.toString());
@@ -373,6 +337,12 @@ public class DDLGenerator {
 
                 ddlList.add(idx++, sw.toString());
             }
+            return ddlList;
+        }
+
+        public List<String> getFooterStatements (Dialect dialect) {
+            List<String> ddlList = new ArrayList<String>();
+            StringWriter sw;
 
             for (AddDDLEntry addDdlFile : getAddDdls()) {
                 if (addDdlFile.getDependentOnEntityClass() != null && !getEntityClasses().contains(addDdlFile.getDependentOnEntityClass())) {
@@ -388,7 +358,7 @@ public class DDLGenerator {
                 ddlList.add(sw.toString());
             }
 
-            return ddlList.toArray(new String[ddlList.size()]);
+            return ddlList;
         }
 
         public Set<Class> getEntityClasses() {
@@ -425,7 +395,6 @@ public class DDLGenerator {
             profile.name = getName();
             profile.outputFile = getOutputFile();
             profile.persistenceUnitName = getPersistenceUnitName();
-            profile.persistenceFiles = new ArrayList<Document>(this.persistenceFiles);
             profile.entityClasses = new LinkedHashSet<Class>(this.entityClasses);
             profile.headerDdls = new ArrayList<AddDDLEntry>(this.headerDdls);
             profile.addDdls = new ArrayList<AddDDLEntry>(this.addDdls);
@@ -545,33 +514,35 @@ public class DDLGenerator {
         @Override
         public String getDdlText(Dialect dialect) {
             if (text == null) {
-                String dialectClassLC = dialect.getClass().getSimpleName().toLowerCase();
-                String classNameLC;
-
                 String template = super.getDdlText(dialect);
-                VelocityContext ctx = new VelocityContext();
-                ctx.put("dialect", dialect);
-
-                ctx.put("is_oracleXE", dialectClassLC.contains("oraclexe"));
+                // this ctx already contains is_* db flags derived from dialect
+                VelocityContext ctx = CreateDDL.newVelocityContext(dialect);
 
                 String driverClassName = DBHelper.getDriverClassName(dialect);
-                if (driverClassName != null) {
+                if (driverClassName != null && !"java.sql.Driver".equalsIgnoreCase(driverClassName)) {
                     ctx.put("driverClassName", driverClassName);
-                    classNameLC = driverClassName.toLowerCase();
+                    // re-apply is_* flags possibly based on driver classname
+                    validateSetDbFlagFromDialectAndDriver(ctx, "is_postgres", DBHelper.isPostgres(dialect), driverClassName, dialect);
+                    validateSetDbFlagFromDialectAndDriver(ctx, "is_oracle", DBHelper.isOracle(dialect), driverClassName, dialect);
+                    validateSetDbFlagFromDialectAndDriver(ctx,"is_hsql", DBHelper.isHsqlDb(dialect), driverClassName, dialect);
                 }
-                else {
-                    classNameLC = dialectClassLC;
-                }
-
-                ctx.put("is_postgres", classNameLC.contains("postgres"));
-                ctx.put("is_oracle", classNameLC.contains("oracle"));
-                ctx.put("is_hsql", classNameLC.contains("hsql"));
 
                 StringWriter wr = new StringWriter();
                 Velocity.evaluate(ctx, wr, url != null ? url.toString() : ddlText, template);
                 text = wr.toString();
             }
             return text;
+        }
+
+        private void validateSetDbFlagFromDialectAndDriver(VelocityContext ctx, String ctxKey, boolean dbTypeFromDriverClassFlag, String driverClassName, Dialect dialect) {
+            Object ctxFlag = ctx.get(ctxKey);
+            if (ctxFlag instanceof Boolean) {
+                if (!ctxFlag.equals(dbTypeFromDriverClassFlag)) {
+                    throw new IllegalStateException("Error validating '"+ctxKey+"': driver class " + driverClassName + " leads to different DB type recognition than the given dialect: " + dialect);
+                }
+            } else {
+                ctx.put(ctxKey, dbTypeFromDriverClassFlag);
+            }
         }
     }
 }

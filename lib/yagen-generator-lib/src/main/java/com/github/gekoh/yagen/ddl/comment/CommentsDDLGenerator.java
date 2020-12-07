@@ -17,6 +17,7 @@ package com.github.gekoh.yagen.ddl.comment;
 
 import com.github.gekoh.yagen.ddl.CoreDDLGenerator;
 import com.github.gekoh.yagen.ddl.DDLGenerator;
+import com.github.gekoh.yagen.hibernate.YagenInit;
 import com.sun.javadoc.AnnotationDesc;
 import com.sun.javadoc.AnnotationValue;
 import com.sun.javadoc.ClassDoc;
@@ -126,6 +127,12 @@ public class CommentsDDLGenerator extends Doclet {
     }
 
     private static DDLGenerator.Profile parseOptions(String[][] options) {
+        try {
+            YagenInit.init();
+        } catch (Exception e) {
+            throw new IllegalStateException(e);
+        }
+
         List<String> args = new ArrayList<String>();
         for (String[] opt : options) {
             if (opt[0].startsWith("--") && CoreDDLGenerator.OPTIONS.hasOption(opt[0].substring(2))) {
@@ -145,7 +152,6 @@ public class CommentsDDLGenerator extends Doclet {
 
     @SuppressWarnings("UnusedDeclaration")
     public static boolean start(RootDoc root) {
-
         DDLGenerator.Profile profile = parseOptions(root.options());
 
         OUTPUT_COMMENTS = new LinkedHashMap<String, Map<String, String>>();

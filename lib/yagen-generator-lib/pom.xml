@@ -21,7 +21,7 @@
     <parent>
         <groupId>com.github.gekoh.yagen</groupId>
         <artifactId>yagen-master</artifactId>
-        <version>3.8-SNAPSHOT</version>
+        <version>5.6-SNAPSHOT</version>
         <relativePath>../..</relativePath>
     </parent>
 
@@ -56,13 +56,6 @@
         </dependency>
 
         <dependency>
-            <groupId>joda-time</groupId>
-            <artifactId>joda-time</artifactId>
-            <scope>compile</scope>
-            <optional>true</optional>
-        </dependency>
-
-        <dependency>
             <groupId>com.thoughtworks.xstream</groupId>
             <artifactId>xstream</artifactId>
             <scope>compile</scope>
@@ -76,7 +69,7 @@
         </dependency>
 
         <dependency>
-            <groupId>javassist</groupId>
+            <groupId>org.javassist</groupId>
             <artifactId>javassist</artifactId>
             <scope>compile</scope>
             <optional>true</optional>
@@ -125,6 +118,14 @@
                         </goals>
                     </execution>
                 </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <source>8</source>
+                    <target>8</target>
+                </configuration>
             </plugin>
         </plugins>
     </build>

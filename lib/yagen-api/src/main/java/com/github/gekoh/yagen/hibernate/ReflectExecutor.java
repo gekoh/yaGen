@@ -32,18 +32,20 @@ public class ReflectExecutor {
     public static final String PATCH_HIBERNATE_CLASS_NAME = "com.github.gekoh.yagen.hibernate.PatchHibernateMappingClasses";
     public static final String DDLENHANCER_CLASS_NAME = "com.github.gekoh.yagen.hibernate.DDLEnhancer";
     public static final String CREATEDDL_CLASS_NAME = "com.github.gekoh.yagen.ddl.CreateDDL";
-    public static final String DDLGEN_CLASS_NAME = "com.github.gekoh.yagen.ddl.DDLGenerator$AddDDLEntry";
+    public static final String DDLGEN_CLASS_NAME = "com.github.gekoh.yagen.ddl.DDLGenerator";
     public static final String YAGENINIT_CLASS_NAME = "com.github.gekoh.yagen.hibernate.YagenInit";
+    public static final String SESSIONFACTORY_CLASS_NAME = "org.hibernate.internal.SessionFactoryImpl";
 
     static final Initializer<Constructor> i_createDdl = getConstructor(CREATEDDL_CLASS_NAME);
 
     static final Initializer<Class> c_enhancer      = getClass(DDLENHANCER_CLASS_NAME);
     static final Initializer<Constructor> i_profile = getConstructor(PROFILE_CLASS_NAME);
 
-    static final Initializer<Method> m_addPersistenceClass = getMethod(PROFILE_CLASS_NAME + ".addPersistenceClass");
+    static final Initializer<Method> m_registerMetadata = getMethod(PROFILE_CLASS_NAME + ".registerMetadata");
     static final Initializer<Method> m_setNamingStrategy   = getMethod(PROFILE_CLASS_NAME + ".setNamingStrategy");
     static final Initializer<Method> m_clone               = getMethod(PROFILE_CLASS_NAME + ".clone");
-    static final Initializer<Method> m_addDdls             = getMethod(PROFILE_CLASS_NAME + ".addDdls");
+    static final Initializer<Method> m_getHeaderStatements = getMethod(PROFILE_CLASS_NAME + ".getHeaderStatements");
+    static final Initializer<Method> m_getFooterStatements = getMethod(PROFILE_CLASS_NAME + ".getFooterStatements");
 
     static final Initializer<Method> m_getDDLEnhancer  = getMethod(DDLENHANCER_CLASS_NAME + ".getDDLEnhancer");
     static final Initializer<Method> m_initDDLEnhancer = getMethod(DDLENHANCER_CLASS_NAME + ".initDDLEnhancer");
@@ -58,9 +60,13 @@ public class ReflectExecutor {
     static final Initializer<Method> m_updateCreateSequence = getMethod(CREATEDDL_CLASS_NAME + ".updateCreateSequence");
     static final Initializer<Method> m_getProfile           = getMethod(CREATEDDL_CLASS_NAME + ".getProfile");
 
-    static final Initializer<Method> m_getDdlText           = getMethod(DDLGEN_CLASS_NAME + ".getDdlText");
+    public static final Initializer<Method> m_getConfigurationValues = getMethod(DDLGEN_CLASS_NAME + ".getConfigurationValues");
+    public static final Initializer<Method> m_createProfile = getMethod(DDLGEN_CLASS_NAME + ".createProfile");
+    public static final Initializer<Method> m_createProfileFromMetadata = getMethod(DDLGEN_CLASS_NAME + ".createProfileFromMetadata");
 
     static final Initializer<Method> m_newProfileIfNull     = getMethod(YAGENINIT_CLASS_NAME + ".newProfileIfNull");
+
+    static final Initializer<Method> m_getMetadata          = getMethod(SESSIONFACTORY_CLASS_NAME + ".getMetadata");
 
     private static Initializer<Method> getMethod(final String fqMethodName) {
         final String className = fqMethodName.substring(0, fqMethodName.lastIndexOf("."));

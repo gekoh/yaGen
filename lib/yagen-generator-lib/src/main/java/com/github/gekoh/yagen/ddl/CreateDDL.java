@@ -34,6 +34,7 @@ import com.github.gekoh.yagen.api.TemporalEntity;
 import com.github.gekoh.yagen.api.UniqueConstraint;
 import com.github.gekoh.yagen.hibernate.PatchGlue;
 import com.github.gekoh.yagen.hst.CreateEntities;
+import com.github.gekoh.yagen.util.DBHelper;
 import com.github.gekoh.yagen.util.FieldInfo;
 import org.apache.commons.lang.StringUtils;
 import org.apache.velocity.VelocityContext;
@@ -77,6 +78,9 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static com.github.gekoh.yagen.hibernate.PatchGlue.STATEMENT_SEPARATOR;
+import static com.github.gekoh.yagen.util.DBHelper.isHsqlDb;
+import static com.github.gekoh.yagen.util.DBHelper.isOracle;
+import static com.github.gekoh.yagen.util.DBHelper.isPostgres;
 
 /**
  * @author Georg Kohlweiss
@@ -120,7 +124,7 @@ public class CreateDDL {
     private static final Pattern SEQ_CREATE_PATTERN = Pattern.compile("create sequence[\\s]+([a-zA-Z]+[0-9a-zA-Z_]*)");
     private static final Pattern PKG_CREATE_PATTERN = Pattern.compile("create( or replace)?[\\s]+package[\\s]+([a-zA-Z]+[0-9a-zA-Z_]*)[\\s]", Pattern.MULTILINE | Pattern.CASE_INSENSITIVE);
 
-    private static final Pattern COL_PATTERN = Pattern.compile("([\\(|\\s]?)(" + REGEX_COLNAME + ")([\\s]((varchar(2)?\\([^\\)]+\\))|(number\\([^\\)]+\\))|(numeric\\([^\\)]+\\))|(timestamp(\\s*\\([0-9]+\\))?)|(date)|([cb]lob)|(char\\([^\\)]+\\))|(int((eger)|[0-9]*))|(bigint)|(bit)|(bool(ean)?)|(((double)|(float))( precision)?)))([\\s]+default[\\s]*([^\\s]*))?(([\\s]+constraint[\\s]+([a-zA-Z]+[0-9a-zA-Z_]*))?([\\s]+not)?[\\s]+null)?(([\\s]+constraint[\\s]+([a-zA-Z]+[0-9a-zA-Z_]*))?[\\s]+unique)?[^\\(,]*(,|\\))");
+    private static final Pattern COL_PATTERN = Pattern.compile("([\\(|\\s]?)(" + REGEX_COLNAME + ")([\\s]((varchar(2)?\\([^\\)]+\\))|(number\\([^\\)]+\\))|(numeric\\([^\\)]+\\))|(timestamp(\\s*\\([0-9]+\\))?)|(date)|([cb]lob)|(char\\([^\\)]+\\))|(int((eger)|[0-9]*))|(bigint)|(bit)|(bool(ean)?)|(((double)|(float[0-9]?))( precision)?)))([\\s]+default[\\s]*([^\\s]*))?(([\\s]+constraint[\\s]+([a-zA-Z]+[0-9a-zA-Z_]*))?([\\s]+not)?[\\s]+null)?(([\\s]+constraint[\\s]+([a-zA-Z]+[0-9a-zA-Z_]*))?[\\s]+unique)?[^\\(,]*(,|\\))");
     private static final int COL_PATTERN_IDX_COLNAME = 2;
     private static final int COL_PATTERN_IDX_TYPE    = 4;
     private static final int COL_PATTERN_IDX_DEFAULT = 26;
@@ -141,7 +145,7 @@ public class CreateDDL {
     private static final int CONSTRAINT_OR_INDEX_PATTERN_IDX_SHORTNAME = 4;
 
     private static final Pattern VIEW_NAME_PATTERN = Pattern.compile("create( or replace)?[\\s]+view[\\s]+([a-zA-Z]+[0-9a-zA-Z_]*)[\\s]", Pattern.MULTILINE | Pattern.CASE_INSENSITIVE);
-    private static final Pattern DROP_TABLE_PATTERN = Pattern.compile("drop table( if exists)?[\\s]+([a-zA-Z]+[0-9a-zA-Z_]*)( if exists)?");
+    private static final Pattern DROP_TABLE_PATTERN = Pattern.compile("drop table (if exists)?[\\s]*([a-zA-Z]+[0-9a-zA-Z_]*)( if exists)?");
 
     public static final String LANGUAGE_VIEW_NAME = "I18N_LANGUAGE_V";
     public static final String I18N_LIVE_TABLE_SUFFIX = "_i18n";
@@ -177,8 +181,6 @@ public class CreateDDL {
     private DDLGenerator.Profile currentProfile;
 
     private List<String> dbObjects = new ArrayList<String>();
-
-    private boolean historyInitSet = false;
 
     public CreateDDL(Object profile, Dialect dialect) {
         if (!(profile instanceof DDLGenerator.Profile)) {
@@ -329,7 +331,8 @@ public class CreateDDL {
         String nameLC = name.toLowerCase();
 
         if (!renderTable(nameLC)) {
-            return "-- skipped dropping table '" + name + "' as the mapped entity was not chosen to be processed";
+            LOG.info("skipped dropping table '" + name + "' as the mapped entity was not chosen to be processed");
+            return "";
         }
 
         if (tblNameToDropObjectsSql.containsKey(nameLC)) {
@@ -390,7 +393,8 @@ public class CreateDDL {
         Set<String> columns = new LinkedHashSet<String>(columnMap.keySet());
 
         if (!renderTable(nameLC)) {
-            return "-- skipped creation statement for table '" + tableName + "' as the mapped entity was not chosen to be processed";
+            LOG.info("skipped creation statement for table '" + tableName + "' as the mapped entity was not chosen to be processed");
+            return "";
         }
 
         checkTableName(dialect, tableName);
@@ -403,7 +407,8 @@ public class CreateDDL {
         }
 
         if (externalViews.contains(nameLC)) {
-            return "-- skipped creation statement for table '" + tableName + "' since there will be a view in place";
+            LOG.info("skipped creation statement for table '" + tableName + "' since there will be a view in place");
+            return "";
         }
 
         String sqlCreate = buf.toString();
@@ -423,7 +428,7 @@ public class CreateDDL {
 
         if (i18nFK != null) {
             String baseEntityTableName = tableConfig.getI18nBaseEntityTblName();
-            String i18nTblName = getProfile().getNamingStrategy().tableName(getI18NDetailTableName(nameLC));
+            String i18nTblName = getI18NDetailTableName(nameLC);
             liveTableName = i18nTblName;
             columnNames = getI18NEntityColumns(columns);
 
@@ -512,7 +517,7 @@ public class CreateDDL {
                     buf.append("-- creating trigger for inserting history rows from table ").append(tableName).append("\n")
                             .append(getOracleHistTriggerSql(dialect, liveTableName, histTableName, histColNameLC, columnNames, pkCols, historyRelevantCols, blobCols, columnMap)).append("\n/");
                 }
-                else if (isPostgreSql(dialect)) {
+                else if (isPostgres(dialect)) {
                     buf.append(STATEMENT_SEPARATOR)
                             .append(getPostgreSQLHistTriggerFunction(dialect, liveTableName, histTableName, histColNameLC, columnNames, pkCols, historyRelevantCols, blobCols, columnMap)).append("\n/");
 
@@ -535,11 +540,6 @@ public class CreateDDL {
                 }
                 else {
                     buf.append(getHsqlDBHistTriggerSql(dialect, liveTableName, histTableName, histColNameLC, columnNames, pkCols, historyRelevantCols, columnMap));
-                }
-
-                if (!historyInitSet) {
-                    getProfile().addHeaderDdl(new DDLGenerator.AddTemplateDDLEntry(CreateDDL.class.getResource("/com/github/gekoh/yagen/ddl/InitHistory.ddl.sql")));
-                    historyInitSet = true;
                 }
             } catch (ClassNotFoundException e) {
                 LOG.info("not generating history table of live table {} since corresponding history entity class not found in classpath", nameLC);
@@ -678,7 +678,7 @@ public class CreateDDL {
         ddl.append("-- not directly creating table '").append(tblName).append("', layered table structure requested");
 
         viewSource.append("\ncreate ");
-        if (isOracle(dialect) || isPostgreSql(dialect)) {
+        if (isOracle(dialect) || isPostgres(dialect)) {
             viewSource.append("or replace ");
         }
         viewSource.append("view ").append(tblName).append(" (").append(colList);
@@ -799,6 +799,10 @@ public class CreateDDL {
                     continue;
                 }
                 String constraintName = getProfile().getNamingStrategy().constraintName(uniqueConstraint);
+                if (uniqueConstraint.functionBased() && !supportsFunctionBased(dialect)) {
+                    LOG.warn("unable to create UniqueConstraint '{}' since function based constraints are not available on target RDBMS", constraintName);
+                    continue;
+                }
                 if (StringUtils.isEmpty(constraintName)) {
                     throw new IllegalArgumentException("please specify an unique constraint name in annotation UniqueConstraint for table " + tableName);
                 }
@@ -839,6 +843,10 @@ public class CreateDDL {
         if (StringUtils.isEmpty(indexName)) {
             throw new IllegalArgumentException("please specify an index name in annotation Index for table " + tableConfig.getTableName());
         }
+        if (index.functionBased() && !supportsFunctionBased(dialect)) {
+            LOG.warn("unable to create Index '{}' since function based indexes are not available on target RDBMS", indexName);
+            return;
+        }
         StringBuilder objDdl = new StringBuilder();
         objDdl.append("create index ").append(indexName);
         objDdl.append(" on ").append(tableConfig.getTableName()).append(" (").append(index.declaration()).append(")");
@@ -862,7 +870,7 @@ public class CreateDDL {
 
     public String updateCreateConstraint(Dialect dialect, StringBuffer buf, String name, Table table, Constraint constraint) {
         NamingStrategy namingStrategy = getProfile().getNamingStrategy();
-        String newName = namingStrategy.constraintName(constraint, getEntityClassName(namingStrategy.tableName(table.getName())));
+        String newName = namingStrategy.constraintName(constraint, getEntityClassName(table.getName()));
 
         if (!name.equals(newName)) {
             String sqlCreate = buf.toString();
@@ -876,10 +884,11 @@ public class CreateDDL {
             name = newName;
         }
 
-        String tableNameLC = getProfile().getNamingStrategy().tableName(table.getName()).toLowerCase();
+        String tableNameLC = table.getName().toLowerCase();
 
         if (!renderTable(tableNameLC) || externalViews.contains(tableNameLC)) {
-            return "-- skipped creation of constraint '" + name + "' for table '" + table.getName() + "' as the mapped entity was not chosen to be processed or is a view";
+            LOG.info("skipped creation of constraint '" + name + "' for table '" + table.getName() + "' as the mapped entity was not chosen to be processed or is a view");
+            return "";
         }
 
         TableConfig tableConfig = tblNameToConfig.get(tableNameLC);
@@ -887,9 +896,10 @@ public class CreateDDL {
         String refTblNameLC = null;
         if (constraint instanceof ForeignKey) {
             if (tableConfig.getColumnNamesIsNoFK().contains(constraint.getColumn(0).getName().toLowerCase())) {
-                return "-- skipped creation of foreign key constraint '" + name + "' for table '" + table.getName() + "' according to annotation of type " + NoForeignKeyConstraint.class.getSimpleName();
+                LOG.info("skipped creation of foreign key constraint '" + name + "' for table '" + table.getName() + "' according to annotation of type " + NoForeignKeyConstraint.class.getSimpleName());
+                return "";
             }
-            refTblNameLC = getProfile().getNamingStrategy().tableName(((ForeignKey) constraint).getReferencedTable().getName()).toLowerCase();
+            refTblNameLC = ((ForeignKey) constraint).getReferencedTable().getName().toLowerCase();
         }
 
         checkObjectName(dialect, name);
@@ -997,13 +1007,15 @@ public class CreateDDL {
             name = newName;
         }
 
-        String tableNameLC = getProfile().getNamingStrategy().tableName(table.getName()).toLowerCase();
+        String tableNameLC = table.getName().toLowerCase();
         if (!renderTable(tableNameLC)) {
-            return "-- skipped creation of index '" + name + "' for table '" + tableNameLC + "' as the mapped entity was not chosen to be processed";
+            LOG.info("skipped creation of index '" + name + "' for table '" + tableNameLC + "' as the mapped entity was not chosen to be processed");
+            return "";
         }
 
         if (externalViews.contains(tableNameLC)) {
-            return "-- skipped creation of index '" + name + "' on table '" + tableNameLC + "' since there is a view in place";
+            LOG.info("skipped creation of index '" + name + "' on table '" + tableNameLC + "' since there is a view in place");
+            return "";
         }
         TableConfig tableConfig = tblNameToConfig.get(tableNameLC);
 
@@ -1054,7 +1066,7 @@ public class CreateDDL {
         return buf.toString();
     }
 
-    public String updateCreateSequence(Dialect dialect, String sqlCreate, org.hibernate.type.Type type) {
+    public String updateCreateSequence(Dialect dialect, String sqlCreate) {
         Matcher matcher = SEQ_CREATE_PATTERN.matcher(sqlCreate);
 
         if (matcher.find()) {
@@ -1101,7 +1113,7 @@ public class CreateDDL {
         if (isOracle(dialect)) {
             createCascadeNullableTrigger(dialect, buf, tableName, colName, "CascadeNullableTrigger.vm.pl.sql", null);
         }
-        else if (isPostgreSql(dialect)) {
+        else if (isPostgres(dialect)) {
             String triggerName = createCascadeNullableTrigger(dialect, buf, tableName, colName, "CascadeNullableTrigger.vm.pl.sql", null);
 
             buf.append(STATEMENT_SEPARATOR)
@@ -1110,7 +1122,7 @@ public class CreateDDL {
                     .append("for each row\n")
                     .append("execute procedure ").append(triggerName).append("()");
         }
-        else if (isHsqlDB(dialect)) {
+        else if (isHsqlDb(dialect)) {
             createCascadeNullableTrigger(dialect, buf, tableName, colName, "hsqldb/CascadeNullableTrigger.vm.pl.sql", "I");
             createCascadeNullableTrigger(dialect, buf, tableName, colName, "hsqldb/CascadeNullableTrigger.vm.pl.sql", "U");
         }
@@ -1119,15 +1131,12 @@ public class CreateDDL {
     private String createCascadeNullableTrigger(Dialect dialect, StringBuffer buf, String tableName, String colName, String template, String operation) {
         String triggerName = getProfile().getNamingStrategy().triggerName(getEntityClassName(tableName), tableName, colName, operation == null ? Constants._NNTR : "_NNT" + operation);
 
-        VelocityContext context = new VelocityContext();
-        context.put("dialect", dialect);
+        VelocityContext context = newVelocityContext(dialect);
         context.put("triggerName", triggerName);
         context.put("operation", operation);
         context.put("tableName", tableName);
         context.put("fkColumnName", colName);
         context.put("SYSTEM_SETTING", getProfile().getNamingStrategy().tableName("SYSTEM_SETTING"));
-
-        setNewOldVar(dialect, context);
 
         StringWriter wr = new StringWriter();
         mergeTemplateFromResource(template, wr, context);
@@ -1137,6 +1146,19 @@ public class CreateDDL {
         buf.append(STATEMENT_SEPARATOR).append(wr.toString()).append("\n/");
 
         return triggerName;
+    }
+
+    static VelocityContext newVelocityContext(Dialect dialect) {
+        VelocityContext context = new VelocityContext();
+        context.put("dialect", dialect);
+        context.put("is_oracle", isOracle(dialect));
+        context.put("is_postgres", isPostgres(dialect));
+        context.put("is_hsql", isHsqlDb(dialect));
+        context.put("is_oracleXE", isOracleXE(dialect));
+        context.put("bypassFunctionality", DBHelper.implementBypassFunctionality(DBHelper.getMetadata(dialect)));
+
+        setNewOldVar(dialect, context);
+        return context;
     }
 
     private String addDefaultValues(String sqlCreate, String nameLC) {
@@ -1202,7 +1224,7 @@ public class CreateDDL {
         int intPrec  = precision != null ? precision : 0;
         int intScale = scale != null ? scale : 0;
 
-        VelocityContext context = new VelocityContext();
+        VelocityContext context = newVelocityContext(dialect);
         context.put("timestampType", dialect.getTypeName(Types.TIMESTAMP, intLen, intPrec, intScale));
         context.put("varcharType", dialect.getTypeName(Types.VARCHAR, intLen, intPrec, intScale));
 
@@ -1228,9 +1250,8 @@ public class CreateDDL {
         Map<String, String> numericColumnDefinitions = findNumericColumnDefinitions(sqlCreate);
         Map<String, String> timestampColumnDefinitions = findTimestampColumnDefinitions(sqlCreate);
 
-        VelocityContext context = new VelocityContext();
+        VelocityContext context = newVelocityContext(dialect);
         context.put("changelogQueryString", changelog.changelogQueryString());
-        context.put("dialect", dialect);
         context.put("viewName", viewName);
         context.put("tableName", tableName);
         context.put("columns", columns);
@@ -1312,14 +1333,15 @@ public class CreateDDL {
             return;
         }
 
-        if (isPostgreSql(dialect)) {
+        if (isPostgres(dialect)) {
+            // TODO: single audit timestamp for postgres
             writePostgreSqlAuditTrigger(dialect, buf, nameLC);
             return;
         }
 
         StringWriter wr = new StringWriter();
 
-        VelocityContext context = new VelocityContext();
+        VelocityContext context = newVelocityContext(dialect);
         context.put("liveTableName", nameLC);
         putIfExisting(context, "created_at", AuditInfo.CREATED_AT, columns);
         putIfExisting(context, "created_by", AuditInfo.CREATED_BY, columns);
@@ -1614,7 +1636,7 @@ public class CreateDDL {
                         throw new IllegalArgumentException("please specify a check constraint name in annotation CheckConstraint for table " + nameLC);
                     }
                     checkObjectName(dialect, constraintName);
-                    if (checkConstraint.initiallyDeferred() && isPostgreSql(dialect)) {
+                    if (checkConstraint.initiallyDeferred() && isPostgres(dialect)) {
                         String objectName = constraintName + "_FCT";
                         additionalObjects.append(STATEMENT_SEPARATOR)
                                 .append(getDeferredCheckConstraintFunction(dialect, objectName, constraintName, nameLC, String.format(checkConstraint.declaration(), "t."), pkColumns))
@@ -1641,6 +1663,10 @@ public class CreateDDL {
                         continue;
                     }
                     String constraintName = getProfile().getNamingStrategy().constraintName(uniqueConstraint);
+                    if (uniqueConstraint.functionBased() && !supportsFunctionBased(dialect)) {
+                        LOG.warn("unable to create UniqueConstraint '{}' since function based constraints are not available on target RDBMS", constraintName);
+                        continue;
+                    }
                     if (StringUtils.isEmpty(constraintName)) {
                         throw new IllegalArgumentException("please specify a unique constraint name in annotation UniqueConstraint on table " + nameLC);
                     }
@@ -1679,9 +1705,7 @@ public class CreateDDL {
     }
 
     private String getDeferredCheckConstraintFunction (Dialect dialect, String objectName, String constraintName, String tableName, String declaration, List<String> pkColumns) {
-        VelocityContext context = new VelocityContext();
-
-        context.put("dialect", dialect);
+        VelocityContext context = newVelocityContext(dialect);
         context.put("objectName", objectName);
         context.put("tableName", tableName);
         context.put("constraintName", constraintName);
@@ -1751,8 +1775,7 @@ public class CreateDDL {
         String shortName = getShortName(nameLC);
 
         if (StringUtils.isEmpty(shortName)) {
-            String tblName = getProfile().getNamingStrategy().tableName(nameLC);
-            shortName = (tblName.length() > 27 ? tblName.substring(0, 27) : tblName);
+            shortName = (nameLC.length() > 27 ? nameLC.substring(0, 27) : nameLC);
         }
 
         String partColName = partitioning.columnName().toLowerCase();
@@ -1866,9 +1889,7 @@ public class CreateDDL {
     }
     
     private String getI18NDetailViewCreateString (Dialect dialect, String i18nDetailTblName, String baseEntityTableName, String i18nTblName, String i18nFKColName, Set<String> columns) {
-        VelocityContext context = new VelocityContext();
-
-        context.put("dialect", dialect);
+        VelocityContext context = newVelocityContext(dialect);
         context.put("i18nDetailTblName", i18nDetailTblName);
         context.put("i18nTblName", i18nTblName);
         context.put("baseEntityTableName", baseEntityTableName);
@@ -1889,10 +1910,9 @@ public class CreateDDL {
     }
 
     private void writeI18NDetailViewTriggerCreateString (Dialect dialect, StringBuffer buf, String i18nDetailTblName, String i18nTblName, String i18nFKColName, Set<String> columns) {
-        VelocityContext context = new VelocityContext();
+        VelocityContext context = newVelocityContext(dialect);
         String triggerBaseName = i18nDetailTblName.length() > MAX_LEN_OBJECT_NAME-4 ? i18nDetailTblName.substring(0, MAX_LEN_OBJECT_NAME-4) : i18nDetailTblName;
 
-        context.put("dialect", dialect);
         context.put("i18nDetailTblName", i18nDetailTblName);
         context.put("i18nTblName", i18nTblName);
         context.put("i18nFKColName", i18nFKColName);
@@ -1903,20 +1923,16 @@ public class CreateDDL {
             String objectName = getProfile().getNamingStrategy().triggerName(triggerBaseName + "_TRG");
             context.put("objectName", objectName);
 
-            setNewOldVar(dialect, context);
-
             mergeTemplateFromResource("I18NDetailViewTrigger.vm.pl.sql", wr, context);
 
             getProfile().duplex(ObjectType.TRIGGER, objectName, wr.toString());
 
             buf.append(STATEMENT_SEPARATOR).append(wr.toString()).append("\n/\n");
         }
-        else if (isPostgreSql(dialect)) {
+        else if (isPostgres(dialect)) {
             String triggerName = getProfile().getNamingStrategy().triggerName(triggerBaseName + "_TRG");
             String objectName = triggerName + "_function";
             context.put("objectName", objectName);
-
-            setNewOldVar(dialect, context);
 
             mergeTemplateFromResource("I18NDetailViewTrigger.vm.pl.sql", wr, context);
 
@@ -1983,7 +1999,7 @@ public class CreateDDL {
                                          Map<String, Column> columnMap) {
         checkObjectName(dialect, objectName);
 
-        VelocityContext context = new VelocityContext();
+        VelocityContext context = newVelocityContext(dialect);
 
         Set<String> hstNoNullColumns = new HashSet<String>();
         TableConfig tableConfig = tblNameToConfig.get(tableName);
@@ -2001,7 +2017,6 @@ public class CreateDDL {
             context.put("MODIFIER_COLUMN_NAME_LENGTH", Constants.USER_NAME_LEN);
             context.put("MODIFIER_COLUMN_TYPE", dialect.getTypeName(Types.VARCHAR, Constants.USER_NAME_LEN, 0, 0));
         }
-        context.put("dialect", dialect);
         context.put("objectName", objectName);
         context.put("liveTableName", tableName);
         context.put("hstTableName", histTableName);
@@ -2014,8 +2029,6 @@ public class CreateDDL {
         context.put("blobCols", blobCols);
         context.put("columnMap", columnMap);
         context.put("varcharType", dialect.getTypeName(Types.VARCHAR, 64, 0, 0));
-
-        setNewOldVar(dialect, context);
 
         StringWriter wr = new StringWriter();
         mergeTemplateFromResource("HstTrigger.vm.pl.sql", wr, context);
@@ -2031,7 +2044,7 @@ public class CreateDDL {
                                             List<String> pkColumns,
                                             List<String> histRelevantCols,
                                             Map<String, Column> columnMap) {
-        VelocityContext context = new VelocityContext();
+        VelocityContext context = newVelocityContext(dialect);
 
         Set<String> nonPkColumns = getNonPkCols(columns, pkColumns);
 
@@ -2361,40 +2374,28 @@ public class CreateDDL {
     }
 
     private static String getNameAndIfExistsWhenSupported(Dialect dialect, String objectName) {
-        if (supportsDropIfExists(dialect)) {
-            if (isPostgreSql(dialect)) {
-                return "if exists " + objectName;
-            }
+        if (dialect.supportsIfExistsBeforeTableName()) {
+            return "if exists " + objectName;
+        }
+        if (dialect.supportsIfExistsAfterTableName()) {
             return objectName + " if exists";
         }
         return objectName;
-    }
-
-    private static boolean isPostgreSql(Dialect dialect) {
-        return dialect.getClass().getSimpleName().toLowerCase().contains("postgres");
-    }
-
-    private static boolean isHsqlDB(Dialect dialect) {
-        return dialect.getClass().getName().toLowerCase().contains("hsql");
-    }
-
-    private static boolean isOracle(Dialect dialect) {
-        return dialect.getClass().getSimpleName().toLowerCase().contains("oracle");
     }
 
     private static boolean isOracleXE(Dialect dialect) {
         return dialect.getClass().getSimpleName().toLowerCase().contains("oraclexe");
     }
 
+    private static boolean supportsFunctionBased(Dialect dialect) {
+        return !isHsqlDb(dialect);
+    }
+
     private static boolean supportsDeferrable(Dialect dialect) {
-        return !isHsqlDB(dialect);
+        return !isHsqlDb(dialect);
     }
 
     private static boolean supportsPartitioning(Dialect dialect) {
         return isOracle(dialect) && !isOracleXE(dialect);
-    }
-
-    private static boolean supportsDropIfExists(Dialect dialect) {
-        return !isOracle(dialect);
     }
 }

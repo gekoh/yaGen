@@ -4,6 +4,9 @@ instead of #if(${operation} == 'I') insert #elseif (${operation} == 'U') update 
 referencing #if( ${operation} != 'D' ) new as new #end #if( ${operation} != 'I' ) old as old #end
 for each row
 begin atomic
+#if( $bypassFunctionality )
+  if not(is_statically_bypassed('${triggerName}')) and is_bypassed(upper('${triggerName}')) = 0 then
+#end
 #if (${operation} == 'D')
   delete from ${i18nTblName} where ${i18nFKColName}=:OLD.${i18nFKColName} and language_cd=:OLD.language_cd;
 #else
@@ -25,5 +28,8 @@ begin atomic
 #end
       );
   end;
+#end
+#if( $bypassFunctionality )
+  end if;
 #end
 end;

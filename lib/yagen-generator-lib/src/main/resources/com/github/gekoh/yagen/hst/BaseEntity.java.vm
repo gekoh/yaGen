@@ -25,9 +25,8 @@ package ${baseClassPackageName};
 import com.github.gekoh.yagen.api.Constants;
 import com.github.gekoh.yagen.api.Generated;
 import com.github.gekoh.yagen.hst.Operation;
-import com.github.gekoh.yagen.hibernate.DateTimeType;
 import org.hibernate.annotations.Type;
-import org.joda.time.DateTime;
+import java.time.LocalDateTime;
 
 import javax.persistence.Column;
 import javax.persistence.EnumType;
@@ -66,28 +65,24 @@ public abstract class BaseEntity {
      */
 #if ( ${dateTimeType} && ${dateTimeType.length()} > 0 )
     @Type(type = "${dateTimeType}")
-#elseif(${dateTimeType} != "")
-    @Type(type = DateTimeType.TYPE)
 #end
     @Column(name = "TRANSACTION_TIMESTAMP", nullable = false)
-    private DateTime transactionTimestamp;
+    private LocalDateTime transactionTimestamp;
 
     /**
      * Entity was invalidated at.
      */
 #if ( ${dateTimeType} && ${dateTimeType.length()} > 0 )
     @Type(type = "${dateTimeType}")
-#elseif(${dateTimeType} != "")
-    @Type(type = DateTimeType.TYPE)
 #end
     @Column(name = "INVALIDATED_AT", nullable = true)
-    private DateTime invalidatedAt;
+    private LocalDateTime invalidatedAt;
 
     protected BaseEntity() {
         this.uuid = UUID.randomUUID().toString().replaceAll("-", "").toUpperCase();
     }
 
-    public BaseEntity(String liveUuid, Operation operation, DateTime transactionTimestamp, DateTime invalidatedAt) {
+    public BaseEntity(String liveUuid, Operation operation, LocalDateTime transactionTimestamp, LocalDateTime invalidatedAt) {
         this();
         setLiveUuid(liveUuid);
         this.operation = operation;
@@ -101,11 +96,11 @@ public abstract class BaseEntity {
 
     protected abstract void setLiveUuid(String liveUuid);
 
-    public DateTime getInvalidatedAt() {
+    public LocalDateTime getInvalidatedAt() {
         return invalidatedAt;
     }
 
-    public DateTime getTransactionTimestamp() {
+    public LocalDateTime getTransactionTimestamp() {
         return transactionTimestamp;
     }
 

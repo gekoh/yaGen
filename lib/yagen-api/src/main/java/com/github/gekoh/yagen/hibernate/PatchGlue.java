@@ -16,30 +16,41 @@
 package com.github.gekoh.yagen.hibernate;
 
 import com.github.gekoh.yagen.api.DefaultNamingStrategy;
+import com.github.gekoh.yagen.util.DBHelper;
 import org.apache.commons.lang.StringUtils;
+import org.hibernate.SessionFactory;
+import org.hibernate.annotations.common.reflection.XClass;
+import org.hibernate.boot.Metadata;
+import org.hibernate.boot.model.naming.PhysicalNamingStrategy;
+import org.hibernate.boot.model.relational.Sequence;
 import org.hibernate.cfg.Configuration;
 import org.hibernate.dialect.Dialect;
+import org.hibernate.engine.jdbc.internal.FormatStyle;
+import org.hibernate.engine.jdbc.internal.Formatter;
+import org.hibernate.internal.SessionFactoryImpl;
 import org.hibernate.mapping.Column;
 import org.hibernate.mapping.Constraint;
-import org.hibernate.mapping.PersistentClass;
+import org.hibernate.mapping.Index;
 import org.hibernate.mapping.Table;
-import org.hibernate.tool.hbm2ddl.SchemaExport;
-import org.hibernate.type.Type;
+import org.hibernate.tool.schema.internal.Helper;
+import org.hibernate.tool.schema.internal.SchemaCreatorImpl;
+import org.hibernate.tool.schema.internal.exec.GenerationTarget;
+import org.hibernate.tool.schema.internal.exec.GenerationTargetToDatabase;
+import org.hibernate.tool.schema.internal.exec.GenerationTargetToScript;
+import org.hibernate.tool.schema.internal.exec.GenerationTargetToStdout;
+import org.hibernate.tool.schema.spi.ExecutionOptions;
 
-import java.io.IOException;
-import java.io.Writer;
+import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.sql.SQLException;
-import java.sql.Statement;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -57,44 +68,58 @@ public class PatchGlue {
                     "(/\\*+(.*?)\\*+/)", // block comment
             Pattern.DOTALL);
 
-    private static Object profile;
-
-    public static void setProfile(Object profile) {
-        PatchGlue.profile = profile;
-    }
-
-    public static Object getProfile() {
-        return profile;
-    }
-
     private static Method schemaExportPerform;
+    private static Field generatorScriptDelimiter;
+    private static Field generatorStdoutDelimiter;
 
-    public static Object newDDLEnhancer(Object profile, Dialect dialect, Collection<PersistentClass> persistentClasses) {
+    public static Object newDDLEnhancer(Object profile, Object metadataObj) {
         try {
-            for (PersistentClass persistentClass : persistentClasses) {
-                addClass(profile, persistentClass);
-            }
-            return ReflectExecutor.i_createDdl.get().newInstance(profile, dialect);
+            Metadata metadata = (Metadata) metadataObj;
+            ReflectExecutor.m_registerMetadata.get().invoke(profile, metadata);
+            return ReflectExecutor.i_createDdl.get().newInstance(profile, metadata.getDatabase().getDialect());
         } catch (Exception e) {
             throw new IllegalStateException(e);
         }
     }
 
-    public static void initDialect(Dialect dialect, org.hibernate.cfg.NamingStrategy namingStrategy, Properties cfgProperties, Object serviceRegistry, Collection persistentClasses) {
+    private static Object createProfile(Metadata metadata) {
+        try {
+            return ReflectExecutor.m_createProfileFromMetadata.get().invoke(null, "runtime", metadata);
+        } catch (Exception e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    public static void initDialect(Metadata metadata) {
+        initDialect(createProfile(metadata), metadata);
+    }
+
+    public static void initDialect(SessionFactory sessionFactory) {
+        if (!(sessionFactory instanceof SessionFactoryImpl)) {
+            throw new IllegalStateException("expecting SessionFactoryImpl");
+        }
+        SessionFactoryImpl impl = (SessionFactoryImpl) sessionFactory;
+
+        try {
+            Metadata metadata = (Metadata) ReflectExecutor.m_getMetadata.get().invoke(impl);
+            initDialect(createProfile(metadata), metadata);
+        } catch (Exception e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    public static void initDialect(Object profile, Metadata metadata) {
+        Dialect dialect = metadata.getDatabase().getDialect();
+
         if (dialect != null && ReflectExecutor.c_enhancer.get().isAssignableFrom(dialect.getClass())) {
             try {
-                if (profile == null) {
-                    profile = ReflectExecutor.i_profile.get().newInstance("runtime");
-                }
-
-                Object clonedProfile = ReflectExecutor.m_clone.get().invoke(profile);
-                Object ddlEnhancer = dialect;
+                PhysicalNamingStrategy namingStrategy = metadata.getDatabase().getPhysicalNamingStrategy();
 
                 if (namingStrategy instanceof DefaultNamingStrategy) {
-                    ReflectExecutor.m_setNamingStrategy.get().invoke(clonedProfile, namingStrategy);
+                    ReflectExecutor.m_setNamingStrategy.get().invoke(profile, namingStrategy);
                 }
-                if (ReflectExecutor.m_getDDLEnhancer.get().invoke(ddlEnhancer) == null) {
-                    ReflectExecutor.m_initDDLEnhancer.get().invoke(ddlEnhancer, clonedProfile, dialect, serviceRegistry, persistentClasses);
+                if (ReflectExecutor.m_getDDLEnhancer.get().invoke(dialect) == null) {
+                    ReflectExecutor.m_initDDLEnhancer.get().invoke(dialect, profile, metadata);
                 }
             } catch (Exception e) {
                 throw new IllegalStateException(e);
@@ -105,18 +130,17 @@ public class PatchGlue {
         }
     }
 
-    public static void addClass (Object profile, PersistentClass clazz) {
-        if (profile != null) {
-            try {
-                ReflectExecutor.m_addPersistenceClass.get().invoke(profile, clazz.getMappedClass());
-            } catch (Exception e) {
-                LOG.error("error adding persistence class", e);
-            }
-        }
+    public static void sortEntityClasses(List<XClass> classes) {
+        classes.sort(Comparator.comparing(XClass::getName));
     }
 
-    public static String afterTableSqlCreateString(Table table, Dialect dialect, String returnValue) {
-        StringBuffer buf = new StringBuffer(returnValue);
+    public static String[] afterTableSqlString(boolean createNotDrop, Table table, Metadata metadata, String[] returnValue) {
+        String objectName = table.getName();
+        if (DBHelper.skipModificationOf(objectName, metadata)) {
+            return returnValue;
+        }
+        Dialect dialect = metadata.getDatabase().getDialect();
+        StringBuffer buf = new StringBuffer(returnValue[0]);
 
         Map<String, Column> allColumns = new LinkedHashMap<String, Column>();
         Iterator<Column> colIt = table.getColumnIterator();
@@ -126,89 +150,92 @@ public class PatchGlue {
         }
 
         Object ddlEnhancer = getDDLEnhancerFromDialect(dialect);
-        if (ddlEnhancer == null) {
-            return returnValue;
+        if (ddlEnhancer != null) {
+            try {
+                returnValue[0] = (String) (createNotDrop ?
+                        ReflectExecutor.m_updateCreateTable.get().invoke(ddlEnhancer, dialect, buf.append(dialect.getTableTypeString()), objectName, allColumns) :
+                        ReflectExecutor.m_updateDropTable.get().invoke(ddlEnhancer, dialect, buf, objectName));
+            } catch (Exception e) {
+                throw new IllegalStateException(e);
+            }
         }
 
-        try {
-            return (String) ReflectExecutor.m_updateCreateTable.get().invoke(ddlEnhancer, dialect, buf.append(dialect.getTableTypeString()), table.getName(), allColumns);
-        } catch (Exception e) {
-            throw new IllegalStateException(e);
-        }
+        return returnValue;
     }
 
-    public static String afterTableSqlDropString(Table table, Dialect dialect, String returnValue) {
-        StringBuffer buf = new StringBuffer(returnValue);
+    public static String[] afterConstraintSqlString(boolean createNotDrop, Constraint constraint, Metadata metadata, String[] returnValue) {
+        if (!createNotDrop || returnValue == null || returnValue.length < 1) {
+            return returnValue;
+        }
+        String objectName = constraint.getName();
+        if (DBHelper.skipModificationOf(objectName, metadata)) {
+            return returnValue;
+        }
+        Dialect dialect = metadata.getDatabase().getDialect();
+        StringBuffer buf = new StringBuffer(returnValue[0]);
 
         Object ddlEnhancer = getDDLEnhancerFromDialect(dialect);
-        if (ddlEnhancer == null) {
-            return returnValue;
+        if (ddlEnhancer != null) {
+            try {
+                returnValue[0] = (String) ReflectExecutor.m_updateCreateConstraint.get().invoke(ddlEnhancer, dialect, buf, objectName, constraint.getTable(), constraint);
+            } catch (Exception e) {
+                throw new IllegalStateException(e);
+            }
         }
 
-        try {
-            return (String) ReflectExecutor.m_updateDropTable.get().invoke(ddlEnhancer, dialect, buf, table.getName());
-        } catch (Exception e) {
-            throw new IllegalStateException(e);
-        }
+        return returnValue;
     }
 
-    public static String afterConstraintSqlCreateString(Table table, Dialect dialect, String returnValue, Constraint constraint) {
-        if (returnValue == null) {
-            return null;
-        }
-
-        StringBuffer buf = new StringBuffer(returnValue);
-
-        Object ddlEnhancer = getDDLEnhancerFromDialect(dialect);
-        if (ddlEnhancer == null) {
+    public static String[] afterIndexSqlString(boolean createNotDrop, Index index, Metadata metadata, String[] returnValue) {
+        if (!createNotDrop) {
             return returnValue;
         }
-
-        try {
-            return (String) ReflectExecutor.m_updateCreateConstraint.get().invoke(ddlEnhancer, dialect, buf, constraint.getName(), table, constraint);
-        } catch (Exception e) {
-            throw new IllegalStateException(e);
+        String objectName = index.getName();
+        if (DBHelper.skipModificationOf(objectName, metadata)) {
+            return returnValue;
         }
-    }
-
-    public static String afterIndexSqlCreateString(Table table, Dialect dialect, String returnValue, String name, Iterator columns) {
-        StringBuffer buf = new StringBuffer(returnValue);
+        Dialect dialect = metadata.getDatabase().getDialect();
+        StringBuffer buf = new StringBuffer(returnValue[0]);
 
         List<Column> columnList = new ArrayList<Column>();
+        Iterator<Column> columns = index.getColumnIterator();
         while ( columns.hasNext() ) {
-            Column column = (Column) columns.next();
+            Column column = columns.next();
             columnList.add(column);
         }
 
         Object ddlEnhancer = getDDLEnhancerFromDialect(dialect);
-        if (ddlEnhancer == null) {
-            return returnValue;
+        if (ddlEnhancer != null) {
+            try {
+                returnValue[0] = (String) ReflectExecutor.m_updateCreateIndex.get().invoke(ddlEnhancer, dialect, buf, objectName, index.getTable(), columnList);
+            } catch (Exception e) {
+                throw new IllegalStateException(e);
+            }
         }
 
-        try {
-            return (String) ReflectExecutor.m_updateCreateIndex.get().invoke(ddlEnhancer, dialect, buf, name, table, columnList);
-        } catch (Exception e) {
-            throw new IllegalStateException(e);
-        }
+        return returnValue;
     }
 
-    public static String[] afterSequenceSqlCreateStrings(Dialect dialect, String[] ddl, Type type) {
-        String returnValue = join(Arrays.asList(ddl), "\n", new StringValueExtractor<String>() {
-            public String getValue(String object) {
-                return object != null ? object : "";
-            }
-        });
+    public static String[] afterSequenceSqlString(boolean createNotDrop, Sequence sequence, Metadata metadata, String[] returnValue) {
+        if (!createNotDrop) {
+            return returnValue;
+        }
+        String objectName = sequence.getName().getSequenceName().getText();
+        if (DBHelper.skipModificationOf(objectName, metadata)) {
+            return returnValue;
+        }
+        Dialect dialect = metadata.getDatabase().getDialect();
 
         Object ddlEnhancer = getDDLEnhancerFromDialect(dialect);
-        if (ddlEnhancer == null) {
-            return ddl;
+        if (ddlEnhancer != null) {
+            try {
+                returnValue[0] = (String) ReflectExecutor.m_updateCreateSequence.get().invoke(ddlEnhancer, dialect, returnValue[0]);
+            } catch (Exception e) {
+                throw new IllegalStateException(e);
+            }
         }
 
-        try {
-            return new String[]{ (String) ReflectExecutor.m_updateCreateSequence.get().invoke(ddlEnhancer, dialect, returnValue, type) };
-        } catch (Exception e) {
-            throw new IllegalStateException(e);
-        }
+        return returnValue;
     }
 
     public static Object getDDLEnhancerFromDialect(Dialect dialect) {
@@ -235,68 +262,66 @@ public class PatchGlue {
         return ReflectExecutor.CONFIGURATION_INTERCEPTOR_INSTANCES;
     }
 
-    public static interface ConfigurationInterceptor {
+    public interface ConfigurationInterceptor {
         void use(Configuration configuration);
     }
 
-    // Hibernate 3
-    public static void schemaExportExecute(boolean script, boolean export, Writer fileOutput, Statement statement, String sql, SchemaExport schemaExport)
-            throws IOException, SQLException {
+    public static void schemaExportPerform (String[] sqlCommands,
+                                            Formatter formatter,
+                                            ExecutionOptions options,
+                                            GenerationTarget[] targets) {
+        for (String sqlCommand : sqlCommands) {
+            writePreparedStatements(sqlCommand, formatter, options, targets);
+        }
+    }
+
+    private static void writePreparedStatements(String sqlCommand, Formatter formatter, ExecutionOptions options, GenerationTarget[] targets) {
         if (schemaExportPerform == null) {
             try {
-                schemaExportPerform = SchemaExport.class.getMethod("executeApi", boolean.class, boolean.class, Writer.class, Statement.class, String.class, String.class);
-            } catch (NoSuchMethodException e) {
-                LOG.error("cannot find api method inserted by patch", e);
+                schemaExportPerform = SchemaCreatorImpl.class.getDeclaredMethod("applySqlStringsApi", String[].class, Formatter.class, ExecutionOptions.class, GenerationTarget[].class);
+                generatorScriptDelimiter = GenerationTargetToScript.class.getDeclaredField("delimiter");
+                generatorScriptDelimiter.setAccessible(true);
+                generatorStdoutDelimiter = GenerationTargetToStdout.class.getDeclaredField("delimiter");
+                generatorStdoutDelimiter.setAccessible(true);
+            } catch (NoSuchMethodException | NoSuchFieldException e) {
+                LOG.error(schemaExportPerform == null ? "cannot find api method inserted by patch" : "cannot find field delimiter of GenerationTarget impl class", e);
             }
         }
-        for (String singleSql : splitSQL(sql)) {
+        final String[] wrapArr = new String[1];
+
+        formatter = new FormatFixFormatter(formatter);
+
+        for (String singleSql : splitSQL(sqlCommand)) {
             SqlStatement ddlStmt = prepareDDL(singleSql);
+            wrapArr[0] = ddlStmt.getSql();
             try {
-                schemaExportPerform.invoke(schemaExport, new Object[]{script, export, fileOutput, statement, ddlStmt.getSql(), ddlStmt.getDelimiter()});
+                GenerationTarget[] passedExporters = new GenerationTarget[1];
+                for (GenerationTarget exporter : targets) {
+                    passedExporters[0] = exporter;
+                    if (exporter.getClass() == GenerationTargetToScript.class) {
+                        generatorScriptDelimiter.set(exporter, ddlStmt.getDelimiter());
+                    }
+                    else if (exporter.getClass() == GenerationTargetToStdout.class) {
+                        generatorStdoutDelimiter.set(exporter, ddlStmt.getDelimiter());
+                    }
+                    else if (exporter.getClass() == GenerationTargetToDatabase.class) {
+                        if (isEmptyStatement(ddlStmt.getSql())) {
+                            continue;
+                        }
+                        if (wrapArr[0].endsWith("/")) {
+                            // remove pl/sql specific ending as postgresql does not like it
+                            wrapArr[0] = wrapArr[0].substring(0, wrapArr[0].length()-1);
+                        }
+                    }
+                    schemaExportPerform.invoke(null, new Object[]{wrapArr, formatter, options, passedExporters});
+                }
             } catch (InvocationTargetException e) {
-                if (e.getCause() instanceof SQLException && !isEmptyStatement(singleSql)) {
+                if (e.getCause() instanceof SQLException) {
                     LOG.warn("failed executing sql: {}", singleSql);
                     LOG.warn("failure: {}", e.getCause().getMessage());
                 }
             } catch (Exception e) {
-                LOG.error("error calling patched api method in SchemaExport", e);
-            }
-        }
-    }
-
-    // Hibernate 4.3.5
-    public static void schemaExportPerform (String[] sqlCommands, List exporters, SchemaExport schemaExport) {
-        if (schemaExportPerform == null) {
-            try {
-                schemaExportPerform = SchemaExport.class.getMethod("performApi", String[].class, List.class, String.class);
-            } catch (NoSuchMethodException e) {
-                LOG.error("cannot find api method inserted by patch", e);
-            }
-        }
-        String[] wrapArr = new String[1];
-        for (String sqlCommand : sqlCommands) {
-            for (String singleSql : splitSQL(sqlCommand)) {
-                SqlStatement ddlStmt = prepareDDL(singleSql);
-                wrapArr[0] = ddlStmt.getSql();
-                boolean emptyStatement = isEmptyStatement(singleSql);
-                try {
-                    List passedExporters = new ArrayList();
-                    passedExporters.add(null);
-                    for (Object exporter : exporters) {
-                        passedExporters.set(0, exporter);
-                        boolean databaseExporter = exporter.getClass().getSimpleName().equals("DatabaseExporter");
-                        if (!databaseExporter || !emptyStatement) {
-                            schemaExportPerform.invoke(schemaExport, new Object[]{wrapArr, passedExporters, databaseExporter ? null : ddlStmt.getDelimiter()});
-                        }
-                    }
-                } catch (InvocationTargetException e) {
-                    if (e.getCause() instanceof SQLException && !emptyStatement) {
-                        LOG.warn("failed executing sql: {}", singleSql);
-                        LOG.warn("failure: {}", e.getCause().getMessage());
-                    }
-                } catch (Exception e) {
-                    LOG.error("cannot call patched api method in SchemaExport", e);
-                }
+                LOG.error("cannot call patched api method in SchemaExport", e);
             }
         }
     }
@@ -411,24 +436,42 @@ public class PatchGlue {
         return sb.toString();
     }
 
+    public static void addHeader(Dialect dialect, ExecutionOptions options, GenerationTarget[] targets) {
+        List<String> statements = getStatements(ReflectExecutor.m_getHeaderStatements.get(), dialect);
+        writeStatement(options, targets, statements);
+    }
 
-    public static String[] addHeaderAndFooter(String[] createSQL, Dialect dialect){
+    public static void addFooter(Dialect dialect, ExecutionOptions options, GenerationTarget[] targets) {
+        List<String> statements = getStatements(ReflectExecutor.m_getFooterStatements.get(), dialect);
+        writeStatement(options, targets, statements);
+    }
+
+    private static void writeStatement(ExecutionOptions options, GenerationTarget[] targets, List<String> statements) {
+        if (statements != null) {
+            final boolean format = Helper.interpretFormattingEnabled( options.getConfigurationValues() );
+            final Formatter formatter = format ? FormatStyle.DDL.getFormatter() : FormatStyle.NONE.getFormatter();
+
+            schemaExportPerform(statements.toArray(new String[statements.size()]), formatter, options, targets);
+        }
+    }
+
+    public static List<String> getStatements(Method method, Dialect dialect){
         Object profile;
-
-        if (dialect != null && ReflectExecutor.c_enhancer.get().isAssignableFrom(dialect.getClass())) {
+        Object enhancer;
+        if (dialect != null && (enhancer = getDDLEnhancerFromDialect(dialect)) != null) {
             try {
-                profile = ReflectExecutor.m_getProfile.get().invoke(ReflectExecutor.m_getDDLEnhancer.get().invoke(dialect));
+                profile = ReflectExecutor.m_getProfile.get().invoke(enhancer);
             } catch (Exception e) {
                 throw new IllegalStateException(e);
             }
         }
         else {
             LOG.warn("{} was not patched, generator enhancements not working", dialect != null ? dialect.getClass().getName() : "Dialect");
-            return createSQL;
+            return null;
         }
 
         try {
-            return (String[]) ReflectExecutor.m_addDdls.get().invoke(profile, createSQL, dialect);
+            return (List<String>) method.invoke(profile, dialect);
         } catch (Exception e) {
             throw new IllegalStateException(e);
         }
@@ -453,6 +496,31 @@ public class PatchGlue {
 
         public String getDelimiter() {
             return delimiter;
+        }
+    }
+
+    public static final class FormatFixFormatter implements Formatter {
+
+        // out of org.hibernate.engine.jdbc.internal.DDLFormatterImpl.INITIAL_LINE
+        private static final String INITIAL_LINE = System.lineSeparator() + "    ";
+        private static final Pattern CREATE_TABLE = Pattern.compile("(.*create table [^\\s(]+\\s?\\(\\s*)", Pattern.MULTILINE);
+
+        protected Formatter delegateFormatter;
+
+        public FormatFixFormatter(Formatter delegateFormatter) {
+            this.delegateFormatter = delegateFormatter;
+        }
+
+        @Override
+        public String format(String sql) {
+            String format = delegateFormatter.format(sql);
+            // first column is indented one char less due to added space char contained in source string before each subsequent column
+            Matcher matcher = CREATE_TABLE.matcher(format);
+            if (matcher.find()) {
+                format = format.substring(0, matcher.end()) + " " + format.substring(matcher.end());
+            }
+            // for whatever reason create statements other than create table do not receive initial newline which would make generated DDL more readable
+            return format.startsWith("create") ? INITIAL_LINE + format : format;
         }
     }
 }

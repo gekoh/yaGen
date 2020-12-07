@@ -16,9 +16,6 @@
 package com.github.gekoh.yagen.example;
 
 import com.github.gekoh.yagen.api.TemporalEntity;
-import com.github.gekoh.yagen.hibernate.DateTimeType;
-import org.hibernate.annotations.Type;
-import org.joda.time.DateTime;
 
 import javax.persistence.Basic;
 import javax.persistence.Column;
@@ -26,6 +23,7 @@ import javax.persistence.Entity;
 import javax.persistence.JoinColumn;
 import javax.persistence.OneToOne;
 import javax.persistence.Table;
+import java.time.LocalDateTime;
 
 /**
  * @author Georg Kohlweiss
@@ -59,21 +57,19 @@ public class PilotLogEntry extends BaseEntity {
      */
     @Basic(optional = false)
     @Column(name = "BLOCK_OFF")
-    @Type(type = DateTimeType.TYPE)
-    private DateTime blockOff;
+    private LocalDateTime blockOff;
 
     /**
      * timestamp of block on in UTC
      */
     @Basic(optional = false)
     @Column(name = "BLOCK_ON")
-    @Type(type = DateTimeType.TYPE)
-    private DateTime blockOn;
+    private LocalDateTime blockOn;
 
     PilotLogEntry() {
     }
 
-    public PilotLogEntry(BoardBookEntry boardBookEntry, int num, String pilotName, DateTime blockOff, DateTime blockOn) {
+    public PilotLogEntry(BoardBookEntry boardBookEntry, int num, String pilotName, LocalDateTime blockOff, LocalDateTime blockOn) {
         this.boardBookEntry = boardBookEntry;
         this.num = num;
         this.pilotName = pilotName;
@@ -93,11 +89,11 @@ public class PilotLogEntry extends BaseEntity {
         return pilotName;
     }
 
-    public DateTime getBlockOff() {
+    public LocalDateTime getBlockOff() {
         return blockOff;
     }
 
-    public DateTime getBlockOn() {
+    public LocalDateTime getBlockOn() {
         return blockOn;
     }
 }

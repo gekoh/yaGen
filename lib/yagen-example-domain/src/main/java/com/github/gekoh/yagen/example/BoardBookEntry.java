@@ -17,9 +17,6 @@ package com.github.gekoh.yagen.example;
 
 import com.github.gekoh.yagen.api.Default;
 import com.github.gekoh.yagen.api.TemporalEntity;
-import com.github.gekoh.yagen.hibernate.DateTimeType;
-import org.hibernate.annotations.Type;
-import org.joda.time.DateTime;
 
 import javax.persistence.Basic;
 import javax.persistence.CollectionTable;
@@ -30,6 +27,7 @@ import javax.persistence.FetchType;
 import javax.persistence.JoinColumn;
 import javax.persistence.Table;
 import javax.persistence.UniqueConstraint;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
 
@@ -67,8 +65,7 @@ public class BoardBookEntry extends BaseEntity {
      * timestamp of departure in UTC
      */
     @Basic(optional = false)
-    @Type(type = DateTimeType.TYPE)
-    private DateTime departed;
+    private LocalDateTime departed;
 
     /**
      * destination airport or airfield, 4 letter ICAO code
@@ -82,8 +79,7 @@ public class BoardBookEntry extends BaseEntity {
      */
     @Basic(optional = false)
     @Column(name = "LANDING_TIME")
-    @Type(type = DateTimeType.TYPE)
-    private DateTime landingTime;
+    private LocalDateTime landingTime;
 
     /**
      * landing count made, especially for touch and go training
@@ -106,7 +102,7 @@ public class BoardBookEntry extends BaseEntity {
     BoardBookEntry() {
     }
 
-    public BoardBookEntry(int num, String crewAndPax, String departedFrom, DateTime departed, String landedAt, DateTime landingTime, int landings) {
+    public BoardBookEntry(int num, String crewAndPax, String departedFrom, LocalDateTime departed, String landedAt, LocalDateTime landingTime, int landings) {
         this.num = num;
         this.crewAndPax = crewAndPax;
         this.departedFrom = departedFrom;
@@ -129,7 +125,7 @@ public class BoardBookEntry extends BaseEntity {
         return departedFrom;
     }
 
-    public DateTime getDeparted() {
+    public LocalDateTime getDeparted() {
         return departed;
     }
 
@@ -137,7 +133,7 @@ public class BoardBookEntry extends BaseEntity {
         return landedAt;
     }
 
-    public DateTime getLandingTime() {
+    public LocalDateTime getLandingTime() {
         return landingTime;
     }
 

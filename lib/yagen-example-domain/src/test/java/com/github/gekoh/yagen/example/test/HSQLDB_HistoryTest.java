@@ -1,5 +1,4 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<!--
+/*
  Copyright 2014 Georg Kohlweiss
 
  Licensed under the Apache License, Version 2.0 (the License);
@@ -13,12 +12,20 @@
  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  See the License for the specific language governing permissions and
  limitations under the License.
--->
-<!DOCTYPE hibernate-mapping PUBLIC
-        "-//Hibernate/Hibernate Mapping DTD 3.0//EN"
-        "http://www.hibernate.org/dtd/hibernate-mapping-3.0.dtd">
-<hibernate-mapping>
+*/
+package com.github.gekoh.yagen.example.test;
 
-    <typedef class="com.github.gekoh.yagen.hibernate.OracleNumericBooleanType" name="numeric_boolean"/>
+/**
+ * @author Georg Kohlweiss
+ */
+public class HSQLDB_HistoryTest extends HistoryTest {
+    @Override
+    protected String getPersistenceUnitName() {
+        return "example-domain-test";
+    }
 
-</hibernate-mapping>
+    @Override
+    protected String getDbUserName() {
+        return "SA";
+    }
+}

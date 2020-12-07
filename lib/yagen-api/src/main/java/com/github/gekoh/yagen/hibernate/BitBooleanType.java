@@ -15,8 +15,11 @@
 */
 package com.github.gekoh.yagen.hibernate;
 
+import org.hibernate.boot.model.TypeContributions;
 import org.hibernate.dialect.Dialect;
+import org.hibernate.service.ServiceRegistry;
 import org.hibernate.type.AbstractSingleColumnStandardBasicType;
+import org.hibernate.type.BooleanType;
 import org.hibernate.type.DiscriminatorType;
 import org.hibernate.type.NumericBooleanType;
 import org.hibernate.type.PrimitiveType;
@@ -26,13 +29,22 @@ import org.hibernate.type.descriptor.sql.BitTypeDescriptor;
 import java.io.Serializable;
 
 /**
- * @author Georg Kohlweiss 
+ * Usage: create custom {@link Dialect} subclass where you
+ * override {@link Dialect#contributeTypes(TypeContributions, ServiceRegistry)} and add this type, e.g.:
+ * <pre>
+ * public void contributeTypes(TypeContributions typeContributions, ServiceRegistry serviceRegistry) {
+ *     super.contributeTypes(typeContributions, serviceRegistry);
+ *     typeContributions.contributeType(new BitBooleanType());
+ * }
+ * </pre>
+ * No type-annotations in entities needed - this type will be automatically used for {@code boolean} and {@code Boolean} fields.
+ *
+ * @author Georg Kohlweiss
  */
-public class OracleNumericBooleanType extends AbstractSingleColumnStandardBasicType<Boolean>
+public class BitBooleanType extends AbstractSingleColumnStandardBasicType<Boolean>
         implements PrimitiveType<Boolean>, DiscriminatorType<Boolean> {
-    //private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(OracleNumericBooleanType.class);
 
-    public OracleNumericBooleanType() {
+    public BitBooleanType() {
         super(BitTypeDescriptor.INSTANCE, BooleanTypeDescriptor.INSTANCE);
     }
 
@@ -59,5 +71,15 @@ public class OracleNumericBooleanType extends AbstractSingleColumnStandardBasicT
     @Override
     public String getName() {
         return NumericBooleanType.INSTANCE.getName();
+    }
+
+    @Override
+    public String[] getRegistrationKeys() {
+        return new String[] {
+                NumericBooleanType.class.getName(),
+                NumericBooleanType.INSTANCE.getName(),
+                BooleanType.INSTANCE.getName(),
+                NumericBooleanType.INSTANCE.getJavaTypeDescriptor().getJavaType().getName()
+        };
     }
 }

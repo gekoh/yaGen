@@ -11,6 +11,12 @@ for each row
 declare
   i18n_row_found ${i18nTblName}%rowtype;
 begin
+#if( $bypassFunctionality )
+  if is_bypassed(upper('${objectName}')) = 1 then
+    return#if( $is_postgres ) new#{end};
+  end if;
+#end
+
   if #if( $is_postgres )TG_OP='DELETE'#{else}deleting#end then
     delete from ${i18nTblName} where ${i18nFKColName}=${old}.${i18nFKColName} and language_cd=${old}.language_cd;
     return#if( $is_postgres ) new#end;

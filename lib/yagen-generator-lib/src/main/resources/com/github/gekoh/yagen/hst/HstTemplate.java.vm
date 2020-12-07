@@ -22,7 +22,7 @@
  */
 package ${entityClassPackageName};
 
-import org.joda.time.DateTime;
+import java.time.LocalDateTime;
 
 import javax.persistence.Table;
 
@@ -89,19 +89,19 @@ public class ${entityClassSimpleName} extends
     }
 
 #if( $entitySuperClassName || $baseEntityUuidColumnName )
-    public ${entityClassSimpleName} (String liveUuid, DateTime transactionTimestamp, DateTime invalidatedAt) {
+    public ${entityClassSimpleName} (String liveUuid, LocalDateTime transactionTimestamp, LocalDateTime invalidatedAt) {
         this(liveUuid, Operation.I, transactionTimestamp, invalidatedAt);
     }
 
-    public ${entityClassSimpleName} (String liveUuid, Operation operation, DateTime transactionTimestamp, DateTime invalidatedAt) {
+    public ${entityClassSimpleName} (String liveUuid, Operation operation, LocalDateTime transactionTimestamp, LocalDateTime invalidatedAt) {
         super(liveUuid, operation, transactionTimestamp, invalidatedAt);
     }
 #else
-    public ${entityClassSimpleName} (DateTime transactionTimestamp, DateTime invalidatedAt) {
+    public ${entityClassSimpleName} (LocalDateTime transactionTimestamp, LocalDateTime invalidatedAt) {
         this(Operation.I, transactionTimestamp, invalidatedAt);
     }
 
-    public ${entityClassSimpleName} (Operation operation, DateTime transactionTimestamp, DateTime invalidatedAt) {
+    public ${entityClassSimpleName} (Operation operation, LocalDateTime transactionTimestamp, LocalDateTime invalidatedAt) {
         super(null, operation, transactionTimestamp, invalidatedAt);
     }
 #end

@@ -32,6 +32,7 @@ public @interface UniqueConstraint {
     String declaration() default "";
     // or specify set of columns to be unique
     String[] columnNames() default {};
+    boolean functionBased() default false;
     boolean usingLocalIndex() default false;
     boolean initiallyDeferred() default false;
 }

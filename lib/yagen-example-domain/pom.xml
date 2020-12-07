@@ -21,7 +21,7 @@
     <parent>
         <groupId>com.github.gekoh.yagen</groupId>
         <artifactId>yagen-master</artifactId>
-        <version>3.8-SNAPSHOT</version>
+        <version>5.6-SNAPSHOT</version>
         <relativePath>../..</relativePath>
     </parent>
 
@@ -31,7 +31,7 @@
     <name>yaGen - example domain lib with ddl generation</name>
 
     <properties>
-        <hst-src.dir>${project.build.directory}/generated-src/main/java</hst-src.dir>
+        <hst-src.dir>${project.build.directory}/generated-sources/main/java</hst-src.dir>
     </properties>
 
     <dependencies>
@@ -58,7 +58,7 @@
         </dependency>
 
         <dependency>
-            <groupId>javassist</groupId>
+            <groupId>org.javassist</groupId>
             <artifactId>javassist</artifactId>
             <optional>true</optional>
         </dependency>
@@ -101,7 +101,23 @@
             <scope>test</scope>
         </dependency>
 
+        <dependency>
+            <groupId>com.opentable.components</groupId>
+            <artifactId>otj-pg-embedded</artifactId>
+            <version>0.13.3</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>1.6.0</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
 
     <build>
         <plugins>
@@ -118,6 +134,10 @@
                         <goals><goal>compile</goal></goals>
                     </execution>
                 </executions>
+                <configuration>
+                    <source>8</source>
+                    <target>8</target>
+                </configuration>
             </plugin>
 
             <plugin>
@@ -140,7 +160,6 @@
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>exec-maven-plugin</artifactId>
-                <version>1.2.1</version>
                 <executions>
                     <!-- generating history entity sources (classes annotated with @TemporalEntity) to be able to use them in JPA -->
                     <execution>
@@ -151,10 +170,11 @@
                         </goals>
                         <configuration>
                             <mainClass>com.github.gekoh.yagen.hst.CreateEntities</mainClass>
+                            <addResourcesToClasspath>true</addResourcesToClasspath>
                             <arguments>
                                 <argument>${hst-src.dir}</argument>
                                 <argument>com.github.gekoh.yagen.example.hst</argument>
-                                <argument>${project.basedir}/src/main/resources/META-INF/example-domain.orm.xml</argument>
+                                <argument>generation-unit</argument>
                                 <argument>${project.build.outputDirectory}/META-INF/example-domain-hst.orm.xml</argument>
                             </arguments>
                         </configuration>
@@ -191,6 +211,7 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>2.12.4</version>
                 <configuration>
+                    <forkMode>always</forkMode>
                     <argLine>-javaagent:${project.build.directory}/agents/yagen-agent.jar</argLine>
                 </configuration>
             </plugin>
@@ -210,7 +231,6 @@
                     <plugin>
                         <groupId>org.codehaus.mojo</groupId>
                         <artifactId>exec-maven-plugin</artifactId>
-                        <version>1.2.1</version>
                         <executions>
                             <execution>
                                 <id>generateDDL</id>
@@ -222,7 +242,7 @@
                                     <mainClass>com.github.gekoh.yagen.ddl.CoreDDLGenerator</mainClass>
                                     <arguments>
                                         <argument>--profile-name</argument>
-                                        <argument>anyName</argument>
+                                        <argument>addImportTimestampProfile</argument>
                                         <argument>--persistence-unit-name</argument>
                                         <argument>generation-unit</argument>
                                         <argument>--output-file</argument>
@@ -260,6 +280,11 @@
                                 </goals>
                                 <configuration>
                                     <doclet>com.github.gekoh.yagen.ddl.comment.CommentsDDLGenerator</doclet>
+<!--
+                                    <additionalJOption>
+                                        -J-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=5005
+                                    </additionalJOption>
+-->
                                     <docletArtifacts>
                                         <docletArtifact>
                                             <groupId>org.slf4j</groupId>
@@ -272,9 +297,9 @@
                                             <version>${project.version}</version>
                                         </docletArtifact>
                                         <docletArtifact>
-                                            <groupId>joda-time</groupId>
-                                            <artifactId>joda-time-hibernate</artifactId>
-                                            <version>${joda-time-hibernate.version}</version>
+                                            <groupId>org.hibernate</groupId>
+                                            <artifactId>hibernate-java8</artifactId>
+                                            <version>${hibernate.version}</version>
                                         </docletArtifact>
                                     </docletArtifacts>
 
@@ -288,7 +313,7 @@
                                     <reportOutputDirectory>${project.build.directory}</reportOutputDirectory>
 
                                     <additionalparam>
-                                        --profile-name anyName
+                                        --profile-name addImportTimestampProfile
                                         --persistence-unit-name generation-unit
                                         --output-file "${project.build.outputDirectory}/META-INF/schema-objects-generated.ddl.sql"
                                     </additionalparam>

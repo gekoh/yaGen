@@ -18,7 +18,6 @@ package com.github.gekoh.yagen;
 import javassist.CannotCompileException;
 import javassist.ClassPool;
 import javassist.CtClass;
-import javassist.CtConstructor;
 import javassist.CtField;
 import javassist.CtMethod;
 import javassist.LoaderClassPath;
@@ -42,15 +41,16 @@ public class PatchTransformer implements ClassFileTransformer {
     public static final String YAGEN_INIT_MARKER_FIELD = "yagenInitDone";
 
     public static final List<String> PATCH_CLASS_LIST = Arrays.asList(
-            "org.hibernate.cfg.Configuration$MappingsImpl",
-            "org.hibernate.cfg.Configuration",
-            "org.hibernate.mapping.Table",
-            "org.hibernate.mapping.Constraint",
-            "org.hibernate.mapping.Index",
-            "org.hibernate.mapping.UniqueKey",
-            "org.hibernate.id.SequenceGenerator",
-            "org.hibernate.tool.hbm2ddl.SchemaExport",
-            "org.hibernate.dialect.Dialect"
+            "org.hibernate.internal.SessionFactoryImpl",
+            "org.hibernate.jpa.boot.internal.EntityManagerFactoryBuilderImpl",
+            "org.hibernate.tool.schema.internal.StandardTableExporter",
+            "org.hibernate.tool.schema.internal.StandardIndexExporter",
+            "org.hibernate.tool.schema.internal.StandardUniqueKeyExporter",
+            "org.hibernate.tool.schema.internal.StandardForeignKeyExporter",
+            "org.hibernate.tool.schema.internal.StandardSequenceExporter",
+            "org.hibernate.tool.schema.internal.SchemaCreatorImpl",
+            "org.hibernate.dialect.Dialect",
+            "org.hibernate.boot.model.source.internal.annotations.AnnotationMetadataSourceProcessorImpl"
     );
 
     private ClassPool classPool;
@@ -102,177 +102,111 @@ public class PatchTransformer implements ClassFileTransformer {
         clazz.addField(new CtField(clazz.getClassPool().get("boolean"), YAGEN_INIT_MARKER_FIELD, clazz));
 
         String className = clazz.getName().replace("/", ".");
-        if("org.hibernate.cfg.Configuration".equals(className)) {
-            patchConfiguration(clazz);
+        if("org.hibernate.internal.SessionFactoryImpl".equals(className)) {
+            patchSessionFactory(clazz);
             return true;
         }
-        if("org.hibernate.mapping.Table".equals(className)) {
-            patchTable(clazz);
+        if("org.hibernate.jpa.boot.internal.EntityManagerFactoryBuilderImpl".equals(className)) {
+            patchEmf(clazz);
             return true;
         }
-        if("org.hibernate.mapping.Index".equals(className)) {
-            patchIndex(clazz);
+        if("org.hibernate.tool.schema.internal.StandardTableExporter".equals(className)) {
+            patchExporterClass(clazz, "afterTableSqlString");
             return true;
         }
-        if("org.hibernate.mapping.UniqueKey".equals(className) || "org.hibernate.mapping.Constraint".equals(className)) {
-            patchConstraint(clazz);
+        if("org.hibernate.tool.schema.internal.StandardIndexExporter".equals(className)) {
+            patchExporterClass(clazz, "afterIndexSqlString");
             return true;
         }
-        if("org.hibernate.id.SequenceGenerator".equals(className)) {
-            patchSequenceGenerator(clazz);
+        if("org.hibernate.tool.schema.internal.StandardUniqueKeyExporter".equals(className) || "org.hibernate.tool.schema.internal.StandardForeignKeyExporter".equals(className)) {
+            patchExporterClass(clazz, "afterConstraintSqlString");
             return true;
         }
-        if("org.hibernate.tool.hbm2ddl.SchemaExport".equals(className)) {
-            patchSchemaExport(clazz);
+        if("org.hibernate.tool.schema.internal.StandardSequenceExporter".equals(className)) {
+            patchExporterClass(clazz, "afterSequenceSqlString");
+            return true;
+        }
+        if("org.hibernate.tool.schema.internal.SchemaCreatorImpl".equals(className)) {
+            patchSchemaCreatorImpl(clazz);
             return true;
         }
         if("org.hibernate.dialect.Dialect".equals(className)) {
             patchDialect(clazz);
             return true;
         }
+        if("org.hibernate.boot.model.source.internal.annotations.AnnotationMetadataSourceProcessorImpl".equals(className)) {
+            clazz.getDeclaredMethod("processEntityHierarchies").insertBefore("com.github.gekoh.yagen.hibernate.PatchGlue.sortEntityClasses(this.xClasses);");
+            return true;
+        }
         return false;
     }
 
-    private static void patchConfiguration(CtClass clazz) throws CannotCompileException, NotFoundException {
+    private static void patchSessionFactory(CtClass clazz) throws NotFoundException, CannotCompileException {
 
-        CtClass serviceRegistryClass = clazz.getClassPool().get("java.lang.Object");
-        clazz.addField(new CtField(serviceRegistryClass, "serviceRegistry", clazz));
+        CtClass metadataClass = clazz.getClassPool().get("org.hibernate.boot.spi.MetadataImplementor");
+        clazz.addField(new CtField(metadataClass, "metadata", clazz));
 
-        clazz.addMethod(CtMethod.make("public void setServiceRegistry(Object serviceRegistry) {\n" +
-                "this.serviceRegistry = serviceRegistry;\n" +
-                "}", clazz));
+        clazz.getConstructors()[0].insertBefore("this.metadata = $1;");
 
-        String initDialectSrc = "com.github.gekoh.yagen.hibernate.PatchGlue.initDialect($1, getNamingStrategy(), getProperties(), serviceRegistry, classes.values());";
+        CtMethod getMetadata = new CtMethod(metadataClass, "getMetadata", null, clazz);
+        getMetadata.setBody("return this.metadata;");
+        clazz.addMethod(getMetadata);
+    }
 
-        clazz.getDeclaredMethod("generateDropSchemaScript").insertBefore(initDialectSrc);
-        clazz.getDeclaredMethod("generateSchemaCreationScript").insertBefore(initDialectSrc);
+    private static void patchEmf(CtClass clazz) throws CannotCompileException, NotFoundException {
 
-        try {
-            clazz.getDeclaredMethod("generateSchemaUpdateScriptList").insertBefore(initDialectSrc);
-            clazz.getDeclaredMethod("generateSchemaUpdateScript").insertBefore(initDialectSrc);
-        } catch (NotFoundException ignore) {
-            // seems that used hibernate version does not have these methods
-        }
+        String initDialectSrc = "com.github.gekoh.yagen.hibernate.PatchGlue.initDialect($_);\n" +
+                "return $_;";
 
-        CtMethod method = clazz.getDeclaredMethod("generateSchemaCreationScript");
+        clazz.getDeclaredMethod("metadata").insertAfter(initDialectSrc);
+    }
+
+    private static void patchExporterClass(CtClass clazz, String patchGlueMethodName) throws NotFoundException, CannotCompileException {
+        CtMethod method = clazz.getDeclaredMethod("getSqlCreateStrings");
 
         method.insertAfter(
-                "$_ = com.github.gekoh.yagen.hibernate.PatchGlue.addHeaderAndFooter($_, dialect);"
+                "$_ = com.github.gekoh.yagen.hibernate.PatchGlue."+patchGlueMethodName+"(true, $1, $2, $_);"
         );
 
-        method = clazz.getDeclaredMethod("reset");
+        method = clazz.getDeclaredMethod("getSqlDropStrings");
 
         method.insertAfter(
-                "com.github.gekoh.yagen.hibernate.ReflectExecutor.newProfileIfNull();\n" +
-                        "java.util.List interceptors = com.github.gekoh.yagen.hibernate.PatchGlue.getConfigurationInterceptors();\n" +
-                        "if (interceptors != null) {\n" +
-                        "    java.util.Iterator it = interceptors.iterator();\n" +
-                        "    while(it.hasNext()) {\n" +
-                        "        ((com.github.gekoh.yagen.hibernate.PatchGlue.ConfigurationInterceptor)it.next()).use(this);\n" +
-                        "    }\n" +
-                        "}"
+                "$_ = com.github.gekoh.yagen.hibernate.PatchGlue."+patchGlueMethodName+"(false, $1, $2, $_);"
         );
     }
 
-    private static void patchTable(CtClass clazz) throws NotFoundException, CannotCompileException {
-        CtMethod method = clazz.getDeclaredMethod("sqlCreateString");
-
-        method.insertAfter(
-                "$_ = com.github.gekoh.yagen.hibernate.PatchGlue.afterTableSqlCreateString($0, $1, $_);"
-        );
-
-        method = clazz.getDeclaredMethod("sqlDropString");
-
-        method.insertAfter(
-                "$_ = com.github.gekoh.yagen.hibernate.PatchGlue.afterTableSqlDropString($0, $1, $_);"
-        );
-    }
-
-    private static void patchIndex(CtClass clazz) throws CannotCompileException, NotFoundException {
-        CtMethod method = clazz.getDeclaredMethod("sqlCreateString");
-
-        method.insertAfter(
-                "$_ = com.github.gekoh.yagen.hibernate.PatchGlue.afterIndexSqlCreateString(getTable(), $1, $_, getName(), getColumnIterator());"
-        );
-    }
-
-    private static void patchConstraint(CtClass clazz) throws CannotCompileException, NotFoundException {
-        CtMethod method = clazz.getDeclaredMethod("sqlCreateString");
-
-        method.insertAfter(
-                "$_ = com.github.gekoh.yagen.hibernate.PatchGlue.afterConstraintSqlCreateString(getTable(), $1, $_, $0);"
-        );
-    }
-
-    private static void patchSequenceGenerator(CtClass clazz) throws CannotCompileException, NotFoundException {
-        CtMethod method = clazz.getDeclaredMethod("sqlCreateStrings");
-
-        method.insertAfter(
-                "$_ = com.github.gekoh.yagen.hibernate.PatchGlue.afterSequenceSqlCreateStrings($1, $_, identifierType);"
-        );
-    }
-
-    private static void patchSchemaExport(CtClass clazz) throws CannotCompileException, NotFoundException {
+    private static void patchSchemaCreatorImpl(CtClass clazz) throws CannotCompileException, NotFoundException {
         ClassPool cp = clazz.getClassPool();
 
-        CtClass ctClassServiceReg = null;
-        try {
-            ctClassServiceReg = cp.get("org.hibernate.service.ServiceRegistry");
-            CtConstructor constructor = clazz.getDeclaredConstructor(new CtClass[]{ctClassServiceReg, cp.get("org.hibernate.cfg.Configuration")});
-            constructor.insertBefore("$2.setServiceRegistry($1);");
-        } catch (NotFoundException ignore) {
-            // will not be able to set service registry since it is not available in hibernate prior ver 4
-        }
+        CtMethod method = clazz.getDeclaredMethod("applySqlStrings");
+        method.setName("applySqlStringsApi");
+        method.setModifiers(Modifier.setPublic(method.getModifiers()));
 
-        try {
-            // Hibernate 4.3.5
-            CtMethod method = clazz.getDeclaredMethod("perform");
-            method.setName("performApi");
-            method.setModifiers(Modifier.setPublic(method.getModifiers()));
-            method.addParameter(cp.get("java.lang.String"));
+        CtMethod newMethod = CtMethod.make(
+                "private static void applySqlStrings(java.lang.String[] sqlStrings,\n" +
+                        "\t\t\torg.hibernate.engine.jdbc.internal.Formatter formatter,\n" +
+                        "\t\t\torg.hibernate.tool.schema.spi.ExecutionOptions options,\n" +
+                        "\t\t\torg.hibernate.tool.schema.internal.exec.GenerationTarget[] targets) {\n" +
+                        "    com.github.gekoh.yagen.hibernate.PatchGlue.schemaExportPerform (sqlStrings, formatter, options, targets);\n" +
+                        "}"
+                ,
+                clazz
+        );
+        clazz.addMethod(newMethod);
 
-            method.insertBefore("delimiter = $3;");
-
-            CtMethod newMethod = CtMethod.make(
-                    "private void perform(String[] sqlCommands, java.util.List exporters) {\n" +
-                            "    com.github.gekoh.yagen.hibernate.PatchGlue.schemaExportPerform (sqlCommands, exporters, $0);\n" +
-                            "}"
-                    ,
-                    clazz
-            );
-            clazz.addMethod(newMethod);
-        } catch (NotFoundException e) {
-            // Hibernate 3
-            CtClass writerCl = cp.get("java.io.Writer");
-            CtClass statementCl = cp.get("java.sql.Statement");
-            CtClass stringCl = cp.get("java.lang.String");
-
-            CtMethod method = clazz.getDeclaredMethod("execute", new CtClass[]{CtClass.booleanType, CtClass.booleanType, writerCl, statementCl, stringCl});
-            method.setName("executeApi");
-            method.setModifiers(Modifier.setPublic(method.getModifiers()));
-            method.addParameter(cp.get("java.lang.String"));
-
-            method.insertBefore("delimiter = $6;");
-
-            CtMethod newMethod = CtMethod.make(
-                    "private void execute(boolean script, boolean export, java.io.Writer fileOutput, java.sql.Statement statement, java.lang.String sql) {\n" +
-                            "    com.github.gekoh.yagen.hibernate.PatchGlue.schemaExportExecute (script, export, fileOutput, statement, sql, $0);\n" +
-                            "}"
-                    ,
-                    clazz
-            );
-            clazz.addMethod(newMethod);
-        }
+        method = clazz.getDeclaredMethod("performCreation");
+        method.insertBefore("com.github.gekoh.yagen.hibernate.PatchGlue.addHeader($2, $3, $5);");
+        method.insertAfter("com.github.gekoh.yagen.hibernate.PatchGlue.addFooter($2, $3, $5);");
     }
 
     private static void patchDialect(CtClass clazz) throws CannotCompileException, NotFoundException {
         clazz.addField(CtField.make("private Object ddlEnhancer;", clazz));
-        clazz.addField(CtField.make("private Object serviceRegistry;", clazz));
+        clazz.addField(CtField.make("private Object metadata;", clazz));
 
         clazz.addMethod(CtMethod.make(
-                "public void initDDLEnhancer(Object profile, org.hibernate.dialect.Dialect dialect, Object serviceRegistry, java.util.Collection persistentClasses) {\n" +
-                        "        this.serviceRegistry = serviceRegistry;\n" +
-                        "        ddlEnhancer = com.github.gekoh.yagen.hibernate.PatchGlue.newDDLEnhancer(profile, dialect, persistentClasses);\n" +
+                "public void initDDLEnhancer(Object profile, Object metadata) {\n" +
+                        "        this.metadata = metadata;\n" +
+                        "        ddlEnhancer = com.github.gekoh.yagen.hibernate.PatchGlue.newDDLEnhancer(profile, metadata);\n" +
                         "    }",
                 clazz
         ));
@@ -285,24 +219,11 @@ public class PatchTransformer implements ClassFileTransformer {
         ));
 
         clazz.addMethod(CtMethod.make(
-                "public Object getServiceRegistry() {\n" +
-                        "        return serviceRegistry;\n" +
+                "public Object getMetadata() {\n" +
+                        "        return metadata;\n" +
                         "    }",
                 clazz
         ));
-
-        // when using hibernate 3 in runtime classpath we need to add a wrapper method since the signature changed slightly and
-        // yagen is build against hibernate 4
-        try {
-            clazz.getDeclaredMethod("getTypeName", new CtClass[]{CtClass.intType, CtClass.longType, CtClass.intType, CtClass.intType});
-        } catch (NotFoundException e) {
-            clazz.addMethod(CtMethod.make(
-                    "public java.lang.String getTypeName(int code, long length, int precision, int scale) throws org.hibernate.HibernateException {\n" +
-                            "return getTypeName(code, (int) length, precision, scale);\n" +
-                            "}",
-                    clazz
-            ));
-        }
 
         clazz.addInterface(clazz.getClassPool().get("com.github.gekoh.yagen.hibernate.DDLEnhancer"));
     }

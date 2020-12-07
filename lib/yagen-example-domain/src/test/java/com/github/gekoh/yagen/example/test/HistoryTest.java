@@ -22,19 +22,19 @@ import com.github.gekoh.yagen.example.EngineType;
 import com.github.gekoh.yagen.hst.Operation;
 import com.github.gekoh.yagen.util.DBHelper;
 import org.apache.commons.lang3.StringUtils;
-import org.joda.time.DateTime;
 import org.junit.Assert;
 import org.junit.Test;
 
 import javax.persistence.Query;
 import java.sql.SQLException;
 import java.sql.Timestamp;
+import java.time.LocalDateTime;
 import java.util.Iterator;
 
 /**
  * @author Georg Kohlweiss
  */
-public class HistoryTest extends TestBase {
+public abstract class HistoryTest extends TestBase {
     //private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(HistoryTest.class);
 
     private final static String PRODUCTION_LOG = StringUtils.repeat("lorem ipsum dolor.\n", 1024); // 20k string
@@ -68,20 +68,20 @@ public class HistoryTest extends TestBase {
     /**
      * Unfortunately this does not work with ORACLE since we use ORACLE's rowid as identifier for transaction changes
      * whereas for HSQLDB we concatenate the primary key columns of collection tables.
-     * So in ORACLE this will violate the UK constraint of the history table.
+     * So in ORACLE (and Postgresql) this will violate the UK constraint of the history table.
      */
     @Test
     public void testHistoryCollectionTableLimitation() {
         testHistory();
 
-        em = emf.createEntityManager();
+        em = getEntityManagerFactory().createEntityManager();
         em.getTransaction().begin();
 
         Aircraft ac = em.createQuery("select ac from Aircraft ac where ac.callSign=:callSign", Aircraft.class)
                 .setParameter("callSign", "OE-DVK")
                 .getSingleResult();
 
-        BoardBookEntry boardBookEntry = new BoardBookEntry(1, "1+3", "LOAN", new DateTime().minusHours(1), "LOAN", new DateTime(), 3);
+        BoardBookEntry boardBookEntry = new BoardBookEntry(1, "1+3", "LOAN", LocalDateTime.now().minusHours(1), "LOAN", LocalDateTime.now(), 3);
         ac.addBoardBookEntry(boardBookEntry);
 
         em.flush();
@@ -136,7 +136,10 @@ public class HistoryTest extends TestBase {
         em.getTransaction().commit();
 
         em.getTransaction().begin();
-        em.createNativeQuery("call set_transaction_timestamp(:ts);").setParameter("ts", timestamp).executeUpdate();
+
+        DBHelper.executeProcedure(em, "set_transaction_timestamp(?)", timestamp);
+        // em.createNativeQuery("call set_transaction_timestamp(:ts);").setParameter("ts", timestamp).executeUpdate();
+
         try {
             em.createNativeQuery("update AIRCRAFT set CALL_SIGN='D-GGGG' where CALL_SIGN='DGGGG'").executeUpdate();
             em.flush();
@@ -163,7 +166,7 @@ public class HistoryTest extends TestBase {
                 .setParameter("callSign", "OE-DVA")
                 .getSingleResult();
 
-        BoardBookEntry boardBookEntry = new BoardBookEntry(1, "1+3", "LOAN", new DateTime().minusHours(1), "LOAN", new DateTime(), 3);
+        BoardBookEntry boardBookEntry = new BoardBookEntry(1, "1+3", "LOAN", LocalDateTime.now().minusHours(1), "LOAN", LocalDateTime.now(), 3);
         ac.addBoardBookEntry(boardBookEntry);
 
         boardBookEntry.getAddedOperatingResources().add("76l AVGAS");
@@ -216,18 +219,19 @@ public class HistoryTest extends TestBase {
         em.createNativeQuery("delete from AIRCRAFT where CALL_SIGN='D_GGGG'").executeUpdate();
         em.flush();
         Assert.assertEquals("deleter", DBHelper.injectSessionUser("anyuser", em));
+
+        System.err.println("1 >>" + DBHelper.getSessionVariable("CLIENT_IDENTIFIER", em));
         em.getTransaction().commit();
+        System.err.println("2 >>" + DBHelper.getSessionVariable("CLIENT_IDENTIFIER", em));
 
         final Query nativeQuery = em.createNativeQuery("select last_modified_by from AIRCRAFT_HST where OPERATION='D' and UUID=(select UUID from AIRCRAFT_HST where OPERATION='I' and CALL_SIGN=:callSign)");
-        Assert.assertEquals("SA (deleter)", nativeQuery.setParameter("callSign", "D_GGGG").getSingleResult());
+        Assert.assertEquals(getDbUserName() + " (deleter)", nativeQuery.setParameter("callSign", "D_GGGG").getSingleResult());
 
         em.getTransaction().begin();
         em.createNativeQuery("delete from AIRCRAFT where CALL_SIGN='D-GGGG'").executeUpdate();
         em.flush();
         em.getTransaction().commit();
 
-        Assert.assertEquals("SA (" + DBHelper.getOsUser()+")", nativeQuery.setParameter("callSign", "D-GGGG").getSingleResult());
-
+        Assert.assertEquals(getDbUserName() + " (anyuser)", nativeQuery.setParameter("callSign", "D-GGGG").getSingleResult());
     }
-
 }

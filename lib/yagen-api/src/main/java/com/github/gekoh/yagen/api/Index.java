@@ -30,5 +30,6 @@ public @interface Index {
     String name();
     // specify custom declaration
     String declaration();
+    boolean functionBased() default false;
     boolean usingLocalIndex() default false;
 }

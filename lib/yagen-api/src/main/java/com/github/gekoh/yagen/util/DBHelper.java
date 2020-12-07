@@ -17,18 +17,25 @@ package com.github.gekoh.yagen.util;
 
 import com.github.gekoh.yagen.hibernate.DDLEnhancer;
 import org.hibernate.Session;
+import org.hibernate.boot.Metadata;
+import org.hibernate.boot.registry.internal.StandardServiceRegistryImpl;
 import org.hibernate.dialect.Dialect;
+import org.hibernate.internal.SessionFactoryImpl;
 import org.hibernate.jdbc.ReturningWork;
+import org.hibernate.jdbc.Work;
+import org.hibernate.service.ServiceRegistry;
 
 import javax.persistence.EntityManager;
-import javax.sql.DataSource;
+import javax.persistence.NoResultException;
 import java.lang.reflect.Field;
-import java.lang.reflect.Method;
 import java.sql.CallableStatement;
 import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.sql.Types;
+import java.util.Map;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
@@ -38,7 +45,28 @@ import static com.github.gekoh.yagen.api.Constants.USER_NAME_LEN;
  * @author Georg Kohlweiss
  */
 public class DBHelper {
+    enum DatabaseDialect {
+        ORACLE,
+        HSQLDB,
+        POSTGRESQL
+    }
+
     private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(DBHelper.class);
+
+    public static final String PROPERTY_GENERATE_BYPASS = "yagen.generator.bypass.implement";
+    public static final String PROPERTY_BYPASS = "yagen.bypass";
+    public static final String PROPERTY_BYPASS_REGEX = "yagen.bypass.regex";
+    public static final String PROPERTY_SKIP_MODIFICATION = "yagen.skip-modification.regex";
+
+    private static Field FIELD_CONFIGURATION_VALUES;
+    static {
+        try {
+            FIELD_CONFIGURATION_VALUES = StandardServiceRegistryImpl.class.getDeclaredField("configurationValues");
+            FIELD_CONFIGURATION_VALUES.setAccessible(true);
+        } catch (NoSuchFieldException e) {
+            LOG.error("unable to get field via reflection", e);
+        }
+    }
 
     public static String createUUID() {
         return UUID.randomUUID().toString().replaceAll("-", "").toUpperCase(); // replace "-" 36 -> 32 char
@@ -50,12 +78,181 @@ public class DBHelper {
         return System.getProperty("user.name");
     }
 
-    public static boolean isBypassed(String objectName) {
-        final String bypass = System.getProperty("yagen.bypass");
+    public static boolean skipModificationOf(String objectName, Metadata metadata) {
+        Map configurationValues = DBHelper.getConfigurationValues(metadata);
+        if (objectName == null || configurationValues == null || !configurationValues.containsKey(PROPERTY_SKIP_MODIFICATION)) {
+            return false;
+        }
+
+        return objectName.matches((String) configurationValues.get(PROPERTY_SKIP_MODIFICATION));
+    }
+
+    public static boolean implementBypassFunctionality(Metadata metadata) {
+        Map configurationValues = metadata != null ? DBHelper.getConfigurationValues(metadata) : null;
+
+        return configurationValues != null && configurationValues.containsKey(PROPERTY_GENERATE_BYPASS) &&
+                Boolean.TRUE.equals(Boolean.valueOf((String) configurationValues.get(PROPERTY_GENERATE_BYPASS)));
+    }
+
+    public static void setBypass(String objectRegex, EntityManager em) {
+        if (objectRegex == null) {
+            objectRegex = "^.*$";
+        }
+        setSessionVariable(PROPERTY_BYPASS_REGEX, objectRegex, em);
+    }
+
+    public static void removeBypass(EntityManager em) {
+        removeSessionVariable(PROPERTY_BYPASS_REGEX, em);
+    }
+
+    public static void removeSessionVariable(DatabaseDialect dialect, Connection connection, String name) throws SQLException {
+        switch (dialect) {
+            case ORACLE:
+            case HSQLDB:
+                try (PreparedStatement stmtUpdate = connection.prepareStatement("delete from SESSION_VARIABLES where name=?")) {
+                    stmtUpdate.setString(1, name);
+                    stmtUpdate.executeUpdate();
+                }
+                break;
+            case POSTGRESQL:
+                try (CallableStatement callableStatement = connection.prepareCall("{call remove_session_variable(?)}")) {
+                    callableStatement.setString(1, name);
+                    callableStatement.execute();
+                }
+                break;
+            default:
+                throw new IllegalArgumentException("unknown dialect: " + dialect);
+        }
+    }
+
+    public static String getSessionVariable(DatabaseDialect dialect, Connection connection, String name) throws SQLException {
+        switch (dialect) {
+            case ORACLE:
+            case HSQLDB:
+                try (PreparedStatement stmtUpdate = connection.prepareStatement("select value from SESSION_VARIABLES where name=?")) {
+                    stmtUpdate.setString(1, name);
+                    try (ResultSet rs = stmtUpdate.executeQuery()) {
+                        if (rs.next()) {
+                            String ret = rs.getString(1);
+                            return ret;
+                        }
+                        return null;
+                    }
+                }
+            case POSTGRESQL:
+                try (CallableStatement callableStatement = connection.prepareCall("{? = call get_session_variable(?)}")) {
+                    callableStatement.setString(2, name);
+                    callableStatement.registerOutParameter(1, Types.VARCHAR);
+                    callableStatement.execute();
+
+                    return callableStatement.getString(1);
+                }
+            default:
+                throw new IllegalArgumentException("unknown dialect: " + dialect);
+        }
+    }
+
+    public static void setSessionVariable(DatabaseDialect dialect, Connection connection, String name, String value) throws SQLException {
+        switch (dialect) {
+            case ORACLE:
+            case HSQLDB:
+                try (PreparedStatement stmtUpdate = connection.prepareStatement("update SESSION_VARIABLES set VALUE=? where NAME=?")) {
+                    stmtUpdate.setString(1, value);
+                    stmtUpdate.setString(2, name);
+                    if (stmtUpdate.executeUpdate() < 1) {
+                        try (PreparedStatement stmtInsert = connection.prepareStatement("insert into SESSION_VARIABLES (name, value) values (?, ?)")) {
+                            stmtInsert.setString(1, name);
+                            stmtInsert.setString(2, value);
+                            stmtInsert.executeUpdate();
+                        }
+                    }
+                }
+                break;
+            case POSTGRESQL:
+                try (CallableStatement callableStatement = connection.prepareCall("{call set_session_variable(?, ?)}")) {
+                    callableStatement.setString(1, name);
+                    callableStatement.setString(2, value);
+                    callableStatement.execute();
+                }
+                break;
+            default:
+                throw new IllegalArgumentException("unknown dialect: " + dialect);
+        }
+    }
+
+    public static void setSessionVariable(String name, String value, EntityManager em) {
+
+        // postgres drops the temporary table when the session closes, so probably we have to create it beforehand
+        if (isPostgres(getDialect(em))) {
+            em.unwrap(Session.class).doWork(new Work() {
+                @Override
+                public void execute(Connection connection) throws SQLException {
+                    setSessionVariable(DatabaseDialect.POSTGRESQL, connection, name, value);
+                }
+            });
+            return;
+        }
+
+        int affected = em.createNativeQuery("update SESSION_VARIABLES set VALUE=:value where NAME=:name")
+                .setParameter("name", name)
+                .setParameter("value", value)
+                .executeUpdate();
+
+        if (affected < 1) {
+            em.createNativeQuery("insert into SESSION_VARIABLES (name, value) values (:name, :value)")
+                    .setParameter("name", name)
+                    .setParameter("value", value)
+                    .executeUpdate();
+        }
+    }
+
+    public static String getSessionVariable(String name, EntityManager em) {
+
+        // postgres drops the temporary table when the session closes, so probably we have to create it beforehand
+        if (isPostgres(getDialect(em))) {
+            return em.unwrap(Session.class).doReturningWork(new ReturningWork<String>() {
+                @Override
+                public String execute(Connection connection) throws SQLException {
+                    String ret = getSessionVariable(DatabaseDialect.POSTGRESQL, connection, name);
+                    return ret;
+                }
+            });
+        }
+
+        String value = null;
+        try {
+            value = (String) em.createNativeQuery("select value from SESSION_VARIABLES where NAME=:name")
+                    .setParameter("name", name)
+                    .getSingleResult();
+        } catch (NoResultException noResult) {
+            // ignore
+        }
+        return value;
+    }
+
+    public static void removeSessionVariable(String name, EntityManager em) {
+        // postgres drops the temporary table when the session closes, so probably it's not even existing
+        if (isPostgres(getDialect(em))) {
+            em.unwrap(Session.class).doWork(new Work() {
+                @Override
+                public void execute(Connection connection) throws SQLException {
+                    removeSessionVariable(DatabaseDialect.POSTGRESQL, connection, name);
+                }
+            });
+            return;
+        }
+
+        em.createNativeQuery("delete from SESSION_VARIABLES where name=:name")
+                .setParameter("name", name)
+                .executeUpdate();
+    }
+
+    public static boolean isStaticallyBypassed(String objectName) {
+        final String bypass = System.getProperty(PROPERTY_BYPASS);
         if (bypass != null) {
             return true;
         }
-        final String bypassPattern = System.getProperty("yagen.bypass.regex");
+        final String bypassPattern = System.getProperty(PROPERTY_BYPASS_REGEX);
         if (bypassPattern != null) {
             return objectName.matches(bypassPattern);
         }
@@ -107,14 +304,15 @@ public class DBHelper {
     }
 
     public static String injectSessionUser(String user, EntityManager em) {
-        String prevUser = null;
-        if (isHsqlDb(em)) {
-            try {
-                prevUser = (String) em.createNativeQuery("select VALUE from SESSION_VARIABLES where NAME='CLIENT_IDENTIFIER'").getSingleResult();
-                em.createNativeQuery("update SESSION_VARIABLES set VALUE=:user where NAME='CLIENT_IDENTIFIER'").setParameter("user", user).executeUpdate();
+        String prevUser;
 
-            } catch (Exception ignore) {
-                em.createNativeQuery("insert into SESSION_VARIABLES (NAME, VALUE) values ('CLIENT_IDENTIFIER', :user)").setParameter("user", user).executeUpdate();
+        if (isPostgres(getDialect(em))
+                || isHsqlDb(getDialect(em))) {
+            prevUser = getSessionVariable("CLIENT_IDENTIFIER", em);
+            if (user == null) {
+                removeSessionVariable("CLIENT_IDENTIFIER", em);
+            } else {
+                setSessionVariable("CLIENT_IDENTIFIER", user, em);
             }
         }
         else {
@@ -124,59 +322,72 @@ public class DBHelper {
         return prevUser;
     }
 
-    private static boolean isHsqlDb(EntityManager em) {
-        return em.unwrap(Session.class).doReturningWork(new ReturningWork<Boolean>() {
-            public Boolean execute(Connection connection) throws SQLException {
-                String driverName = connection.getMetaData().getDriverName();
+    public static boolean isHsqlDb(Dialect dialect) {
+        return dialectMatches(dialect, "hsql");
+    }
 
-                return driverName != null && driverName.toLowerCase().contains("hsql");
+    public static boolean isPostgres(Dialect dialect) {
+        return dialectMatches(dialect, "postgres");
+    }
+
+    public static boolean isOracle(Dialect dialect) {
+        return dialectMatches(dialect, "oracle");
+    }
+
+    private static boolean dialectMatches(Dialect dialect, String subStr) {
+        String driverClassName = getDriverClassName(dialect);
+        return driverClassName != null ? driverClassName.toLowerCase().contains(subStr) : dialect.getClass().getName().toLowerCase().contains(subStr);
+    }
+
+    public static Metadata getMetadata(Dialect dialect) {
+        Object metadataObj;
+        if (!(dialect instanceof DDLEnhancer) || (metadataObj = ((DDLEnhancer) dialect).getMetadata()) == null) {
+            return null;
+        }
+        return (Metadata) metadataObj;
+    }
+
+    public static String getDriverClassName(EntityManager em) {
+        return em.unwrap(Session.class).doReturningWork(new ReturningWork<String>() {
+            public String execute(Connection connection) throws SQLException {
+                return connection.getMetaData().getDriverName();
             }
         });
     }
 
-    public static String getDriverClassName(Dialect dialect) {
-        return dialect instanceof DDLEnhancer ? getDriverClassName(((DDLEnhancer) dialect).getServiceRegistry()) : null;
+    public static Dialect getDialect(EntityManager em) {
+        if (em.unwrap(Session.class) != null) {
+            final SessionFactoryImpl sessionFactory = em.unwrap(Session.class).getSessionFactory().unwrap(SessionFactoryImpl.class);
+            return sessionFactory != null ? sessionFactory.getJdbcServices().getDialect() : null;
+        }
+        return null;
     }
 
-    public static String getDriverClassName(Object serviceRegistry) {
-        String driverClassName = null;
+    public static String getDriverClassName(Dialect dialect) {
 
-        if (serviceRegistry == null) {
+        Metadata metadata = getMetadata(dialect);
+        if (metadata == null) {
             return null;
         }
 
-        Method getService = null;
-        try {
-            getService = Class.forName("org.hibernate.service.ServiceRegistry").getDeclaredMethod("getService", Class.class);
-        } catch (Exception e) {
-            LOG.warn("cannot detect jdbc driver name");
-            return null;
+        Map configurationValues = getConfigurationValues(metadata);
+        if (configurationValues != null) {
+            return (String) configurationValues.get("hibernate.connection.driver_class");
         }
+        LOG.warn("cannot detect jdbc driver name");
+        return null;
+    }
+
+    public static Map getConfigurationValues(Metadata metadata) {
+        ServiceRegistry serviceRegistry = metadata.getDatabase().getServiceRegistry();
         try {
-
-            Class providerClass = Class.forName("org.hibernate.service.jdbc.connections.internal.DatasourceConnectionProviderImpl");
-            Field dataSourceField = providerClass.getDeclaredField("dataSource");
-            dataSourceField.setAccessible(true);
-            DataSource dataSource = (DataSource) dataSourceField.get(getService.invoke(serviceRegistry, Class.forName("org.hibernate.service.jdbc.connections.spi.ConnectionProvider")));
-            Field driverClassNameField = dataSource.getClass().getDeclaredField("driverClassName");
-            driverClassNameField.setAccessible(true);
-
-            driverClassName = (String) driverClassNameField.get(dataSource);
-        } catch (Exception e) {
-
-            try {
-                Field creatorField = Class.forName("org.hibernate.engine.jdbc.connections.internal.DriverManagerConnectionProviderImpl").getDeclaredField("connectionCreator");
-                creatorField.setAccessible(true);
-                Field driverField = Class.forName("org.hibernate.engine.jdbc.connections.internal.DriverConnectionCreator").getDeclaredField("driver");
-                driverField.setAccessible(true);
-
-                driverClassName = driverField.get(creatorField.get(getService.invoke(serviceRegistry, Class.forName("org.hibernate.engine.jdbc.connections.spi.ConnectionProvider")))).getClass().getName();
-            } catch (Exception e1) {
-                LOG.warn("cannot detect jdbc driver name");
+            if (serviceRegistry instanceof StandardServiceRegistryImpl && FIELD_CONFIGURATION_VALUES != null) {
+                return (Map) FIELD_CONFIGURATION_VALUES.get(serviceRegistry);
             }
+        } catch (Exception ignore) {
         }
-
-        return driverClassName;
+        LOG.warn("cannot get configuration values");
+        return null;
     }
 
     public static Timestamp getCurrentTimestamp() {
@@ -207,4 +418,20 @@ public class DBHelper {
         }
     }
 
+    public static void executeProcedure(EntityManager em, String method, Object... args) {
+        Session session = em.unwrap(Session.class);
+        session.doWork(new Work() {
+            @Override
+            public void execute(Connection connection) throws SQLException {
+                try (CallableStatement callableStatement = connection.prepareCall(String.format("{call %s}", method))) {
+                    if (args != null) {
+                        for (int i = 0; i<args.length; i++) {
+                            callableStatement.setObject(i+1, args[i]);
+                        }
+                    }
+                    callableStatement.execute();
+                }
+            }
+        });
+    }
 }

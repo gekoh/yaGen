@@ -5,6 +5,12 @@ for each row
 declare
   user_name ${liveTableName}.${created_by}%type;
 begin
+#if( $bypassFunctionality )
+  if is_bypassed(upper('${triggerName}')) = 1 then
+    return#if( $is_postgres ) new#{end};
+  end if;
+
+#end
   if INSERTING then
     user_name := case when :new.${created_at} is not null then :new.${created_by} end;
   else #*

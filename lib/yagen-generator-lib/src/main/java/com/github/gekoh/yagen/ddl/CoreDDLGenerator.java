@@ -15,6 +15,7 @@
 */
 package com.github.gekoh.yagen.ddl;
 
+import com.github.gekoh.yagen.hibernate.ReflectExecutor;
 import com.github.gekoh.yagen.hibernate.YagenInit;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
@@ -28,10 +29,10 @@ import org.apache.commons.cli.ParseException;
 public class CoreDDLGenerator {
     private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(CoreDDLGenerator.class);
 
+    public static final String PERSISTENCE_UNIT_PROPERTY_PROFILE_PROVIDER_CLASS = "yagen.generator.profile.providerClass";
+
     private static final String PARAM_PROFILE_NAME = "profile-name";
-    public static final String PARAM_PROFILE_PROVIDER_CLASS = "profile-provider-class";
     private static final String PARAM_PERSISTENCE_UNIT_NAME = "persistence-unit-name";
-    private static final String PARAM_PERSISTENCE_XML_LIST = "persistence-xml-list";
     private static final String PARAM_OUTPUT_FILENAME = "output-file";
     private static final String PARAM_HEADER_DDLS_LIST = "header-ddl-list";
     private static final String PARAM_ADDITIONAL_DDLS_LIST = "additional-ddl-list";
@@ -43,9 +44,7 @@ public class CoreDDLGenerator {
     static {
         addOption(PARAM_PROFILE_NAME, true, "name of profile to be used");
         addOption(PARAM_OUTPUT_FILENAME, true, "path of generated ddl file");
-        addOption(PARAM_PROFILE_PROVIDER_CLASS, true, "full qualified class name of profile provider");
         addOption(PARAM_PERSISTENCE_UNIT_NAME, true, "name of the persistent unit holding the entity configuration");
-        addOption(PARAM_PERSISTENCE_XML_LIST, true, "semicolon separated list of persistence files to be scanned");
         addOption(PARAM_HEADER_DDLS_LIST, true, "semicolon separated list of header include files");
         addOption(PARAM_ADDITIONAL_DDLS_LIST, true, "semicolon separated list of footer include files");
         addOption(PARAM_REGEX_RENDER_ONLY_ENTITIES, true, "entities matching specified regex will be rendered");
@@ -58,6 +57,11 @@ public class CoreDDLGenerator {
 
     public static void main(String[] args) {
         try {
+            YagenInit.init();
+        } catch (Exception e) {
+            throw new IllegalStateException("cannot init patches for ddl generator", e);
+        }
+        try {
             generateFrom(createProfileFrom(args));
         } catch (ParseException e) {
             LOG.error("error parsing arguments", e);
@@ -65,13 +69,8 @@ public class CoreDDLGenerator {
     }
 
     public static void generateFrom(DDLGenerator.Profile profile) {
-        try {
-            YagenInit.init(profile);
-        } catch (Exception e) {
-            throw new IllegalStateException("cannot init patches for ddl generator", e);
-        }
 
-        profile.addHeaderDdl(new DDLGenerator.AddTemplateDDLEntry(
+        profile.addHeaderDdlOnTop(new DDLGenerator.AddTemplateDDLEntry(
                 "#if( ${dialect.getClass().getSimpleName().toLowerCase().contains('oracle')} )\n" +
                 "-- this prevents us from being asked by the executing SQL console to replace a variable\n" +
                 "-- when using entity declarations like &amp; in varchar values\n" +
@@ -99,24 +98,18 @@ public class CoreDDLGenerator {
 
         try {
 
-            if (cl.hasOption(PARAM_PROFILE_PROVIDER_CLASS)) {
-                profile = ((ProfileProvider) Class.forName(cl.getOptionValue(PARAM_PROFILE_PROVIDER_CLASS)).newInstance())
-                        .getProfile(cl.getOptionValue(PARAM_PROFILE_NAME));
+            if (cl.hasOption(PARAM_PERSISTENCE_UNIT_NAME)) {
+                String persistenceUnit = cl.getOptionValue(PARAM_PERSISTENCE_UNIT_NAME);
+                profile = (DDLGenerator.Profile) ReflectExecutor.m_createProfile.get().invoke(null, "ddl-gen_" + persistenceUnit, persistenceUnit);
+
+                profile.setPersistenceUnitName(persistenceUnit);
             }
             else {
-                profile = new DDLGenerator.Profile(cl.getOptionValue(PARAM_PROFILE_NAME));
+                throw new IllegalStateException("parameter " + PARAM_PERSISTENCE_UNIT_NAME + " required");
             }
 
             if (cl.hasOption(PARAM_OUTPUT_FILENAME)) {
                 profile.setOutputFile(cl.getOptionValue(PARAM_OUTPUT_FILENAME));
-            }
-
-            if (cl.hasOption(PARAM_PERSISTENCE_UNIT_NAME)) {
-                profile.setPersistenceUnitName(cl.getOptionValue(PARAM_PERSISTENCE_UNIT_NAME));
-            }
-
-            if (cl.hasOption(PARAM_PERSISTENCE_XML_LIST)) {
-                profile.addPersistenceFile(cl.getOptionValue(PARAM_PERSISTENCE_XML_LIST).split(";[\\s]*"));
             }
 
             if (cl.hasOption(PARAM_HEADER_DDLS_LIST)) {
@@ -138,10 +131,12 @@ public class CoreDDLGenerator {
             if (cl.hasOption(PARAM_REGEX_RENDER_ONLY_ENTITIES)) {
                 profile.setOnlyRenderEntitiesRegex(cl.getOptionValue(PARAM_REGEX_RENDER_ONLY_ENTITIES));
             }
-        } catch (ClassNotFoundException e) {
-            throw new IllegalStateException("cannot instantiate profile provider class " + cl.getOptionValue(PARAM_PROFILE_PROVIDER_CLASS));
         } catch (Exception e) {
-            throw new IllegalStateException("error setting up generator profile: " + e.getMessage(), e);
+            Throwable msgE = e;
+            while (msgE != null && msgE.getMessage() == null) {
+                msgE = msgE.getCause();
+            }
+            throw new IllegalStateException("error setting up generator profile: " + (msgE != null && msgE.getMessage() != null ? msgE.getMessage() : e.toString()), e);
         }
 
         return profile;

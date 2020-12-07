@@ -5,9 +5,11 @@ for each row
 begin atomic
 #if( $last_modified_by )
   declare user_name varchar(35);
-
-if not(is_bypassed('${triggerName}')) then
-
+#end
+#if( $bypassFunctionality )
+  if not(is_statically_bypassed('${triggerName}')) and is_bypassed(upper('${triggerName}')) = 0 then
+#end
+#if( $last_modified_by )
 #*
 -- re-/set the modifier / modifierdate values ONLY if no different modifier since last update
 -- has been set in incoming value - this enables entity listeners to work properly as their values will be kept
@@ -20,5 +22,7 @@ if not(is_bypassed('${triggerName}')) then
   set new.${last_modified_by} = substr(get_audit_user(user_name), 1, ${MODIFIER_COLUMN_NAME_LENGTH});
 #end
   set new.${last_modified_at} = systimestamp_9();
-end if;
+#if( $bypassFunctionality )
+  end if;
+#end
 end;

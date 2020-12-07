@@ -15,12 +15,21 @@
 */
 package com.github.gekoh.yagen.api;
 
+import org.hibernate.boot.model.naming.PhysicalNamingStrategy;
 import org.hibernate.mapping.Constraint;
 
 /**
  * @author Georg Kohlweiss 
  */
-public interface NamingStrategy extends org.hibernate.cfg.NamingStrategy {
+public interface NamingStrategy extends PhysicalNamingStrategy {
+
+    String tableName(String tableName);
+
+    String columnName(String columnName);
+
+    String collectionTableName(String ownerEntity, String ownerEntityTable, String associatedEntity, String associatedEntityTable, String propertyName);
+
+    String classToTableName(String className);
 
     /**
      * Return a table short name for an entity class
