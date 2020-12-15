@@ -100,17 +100,17 @@ public class CreateEntities {
         Reader customBaseTemplate = null;
         if (args.length > 6 && StringUtils.isNotEmpty(args[6])) {
             try {
-                customBaseTemplate = new FileReader(args[6]);
-            } catch (FileNotFoundException e) {
-                e.printStackTrace();
+                customBaseTemplate = new InputStreamReader(getResource(args[6]));
+            } catch (Exception e) {
+                LOG.error("unable reading resource {}", args[6], e);
                 return;
             }
         }
         if (args.length > 7 && StringUtils.isNotEmpty(args[7])) {
             try {
-                createEntities.template = readContents(new FileInputStream(args[7]));
-            } catch (FileNotFoundException e) {
-                e.printStackTrace();
+                createEntities.template = readContents(getResource(args[7]));
+            } catch (Exception e) {
+                LOG.error("unable reading resource {}", args[7], e);
                 return;
             }
         }
@@ -126,6 +126,14 @@ public class CreateEntities {
             File orm10OutFile = new File(args[4]);
             createEntities.writeOrmFile(orm10OutFile, args[1], "1.0");
         }
+    }
+
+    private static InputStream getResource(String resource) throws FileNotFoundException {
+        InputStream resourceAsStream = CreateEntities.class.getResourceAsStream(resource);
+        if (resourceAsStream == null) {
+            resourceAsStream = new FileInputStream(resource);
+        }
+        return resourceAsStream;
     }
 
     private File outputDirectory;
@@ -405,6 +413,7 @@ public class CreateEntities {
             FileWriter wr = new FileWriter(outFile);
             Velocity.evaluate(context, wr, CreateEntities.class.getSimpleName()+"#createHistoryEntity", template);
             wr.close();
+            LOG.info("created entity class file: {}", outFile);
         } catch (IOException e) {
             throw new IllegalStateException("cannot create output file", e);
         }

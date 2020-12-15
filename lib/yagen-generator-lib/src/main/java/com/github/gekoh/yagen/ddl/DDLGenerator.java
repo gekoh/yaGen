@@ -482,6 +482,7 @@ public class DDLGenerator {
                 try {
                     rd = new InputStreamReader(url.openStream());
                 } catch (FileNotFoundException e) {
+                    LOG.warn("unable reading resource {}", url);
                     return "";
                 } catch (IOException e) {
                     throw new IllegalArgumentException(e);
