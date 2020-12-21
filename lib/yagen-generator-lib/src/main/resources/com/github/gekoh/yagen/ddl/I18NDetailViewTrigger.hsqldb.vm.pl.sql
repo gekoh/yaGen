@@ -8,7 +8,7 @@ begin atomic
   if not(is_statically_bypassed('${triggerName}')) and is_bypassed(upper('${triggerName}')) = 0 then
 #end
 #if (${operation} == 'D')
-  delete from ${i18nTblName} where ${i18nFKColName}=:OLD.${i18nFKColName} and language_cd=:OLD.language_cd;
+  delete from ${i18nTblName} where ${i18nFKColName}=old.${i18nFKColName} and language_cd=old.language_cd;
 #else
   begin atomic
     declare exit handler for sqlstate '23505' --integrity constraint violation: unique constraint or index violation
