@@ -21,6 +21,7 @@ import javax.persistence.Basic;
 import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.JoinColumn;
+import javax.persistence.Lob;
 import javax.persistence.OneToOne;
 import javax.persistence.Table;
 import java.time.LocalDateTime;
@@ -66,15 +67,20 @@ public class PilotLogEntry extends BaseEntity {
     @Column(name = "BLOCK_ON")
     private LocalDateTime blockOn;
 
+    @Lob
+    @Column(name = "NOTE", nullable = false)
+    private String note;
+
     PilotLogEntry() {
     }
 
-    public PilotLogEntry(BoardBookEntry boardBookEntry, int num, String pilotName, LocalDateTime blockOff, LocalDateTime blockOn) {
+    public PilotLogEntry(BoardBookEntry boardBookEntry, int num, String pilotName, LocalDateTime blockOff, LocalDateTime blockOn, String note) {
         this.boardBookEntry = boardBookEntry;
         this.num = num;
         this.pilotName = pilotName;
         this.blockOff = blockOff;
         this.blockOn = blockOn;
+        this.note = note;
     }
 
     public BoardBookEntry getBoardBookEntry() {
@@ -95,5 +101,9 @@ public class PilotLogEntry extends BaseEntity {
 
     public LocalDateTime getBlockOn() {
         return blockOn;
+    }
+
+    public String getNote() {
+        return note;
     }
 }
