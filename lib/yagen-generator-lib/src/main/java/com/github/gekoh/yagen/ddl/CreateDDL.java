@@ -124,17 +124,17 @@ public class CreateDDL {
     private static final Pattern SEQ_CREATE_PATTERN = Pattern.compile("create sequence[\\s]+([a-zA-Z]+[0-9a-zA-Z_]*)");
     private static final Pattern PKG_CREATE_PATTERN = Pattern.compile("create( or replace)?[\\s]+package[\\s]+([a-zA-Z]+[0-9a-zA-Z_]*)[\\s]", Pattern.MULTILINE | Pattern.CASE_INSENSITIVE);
 
-    private static final Pattern COL_PATTERN = Pattern.compile("([\\(|\\s]?)(" + REGEX_COLNAME + ")([\\s]((varchar(2)?\\([^\\)]+\\))|(number\\([^\\)]+\\))|(numeric\\([^\\)]+\\))|(timestamp(\\s*\\([0-9]+\\))?)|(date)|([cb]lob)|(char\\([^\\)]+\\))|(int((eger)|[0-9]*))|(bigint)|(bit)|(bool(ean)?)|(((double)|(float[0-9]?))( precision)?)))([\\s]+default[\\s]*([^\\s]*))?(([\\s]+constraint[\\s]+([a-zA-Z]+[0-9a-zA-Z_]*))?([\\s]+not)?[\\s]+null)?(([\\s]+constraint[\\s]+([a-zA-Z]+[0-9a-zA-Z_]*))?[\\s]+unique)?[^\\(,]*(,|\\))");
+    private static final Pattern COL_PATTERN = Pattern.compile("([\\(|\\s]?)(" + REGEX_COLNAME + ")([\\s]((varchar(2)?\\([^\\)]+\\))|(number\\([^\\)]+\\))|(numeric\\([^\\)]+\\))|(timestamp(\\s*\\([0-9]+\\))?)|(date)|([cb]lob)|(text)|(char\\([^\\)]+\\))|(int((eger)|[0-9]*))|(bigint)|(bit)|(bool(ean)?)|(((double)|(float[0-9]?))( precision)?)))([\\s]+default[\\s]*([^\\s]*))?(([\\s]+constraint[\\s]+([a-zA-Z]+[0-9a-zA-Z_]*))?([\\s]+not)?[\\s]+null)?(([\\s]+constraint[\\s]+([a-zA-Z]+[0-9a-zA-Z_]*))?[\\s]+unique)?[^\\(,]*(,|\\))");
     private static final int COL_PATTERN_IDX_COLNAME = 2;
     private static final int COL_PATTERN_IDX_TYPE    = 4;
-    private static final int COL_PATTERN_IDX_DEFAULT = 26;
-    private static final int COL_PATTERN_IDX_NOTNULL = 28;
-    private static final int COL_PATTERN_IDX_NOTNULL_CONS = 29;
-    private static final int COL_PATTERN_IDX_NOTNULL_CONS_NAME = 30;
-    private static final int COL_PATTERN_IDX_NOT     = 31;
-    private static final int COL_PATTERN_IDX_UNIQUE  = 32;
-    private static final int COL_PATTERN_IDX_UNIQUE_CONS = 33;
-    private static final int COL_PATTERN_IDX_UNIQUE_CONS_NAME = 34;
+    private static final int COL_PATTERN_IDX_DEFAULT = 27;
+    private static final int COL_PATTERN_IDX_NOTNULL = 29;
+    private static final int COL_PATTERN_IDX_NOTNULL_CONS = 30;
+    private static final int COL_PATTERN_IDX_NOTNULL_CONS_NAME = 31;
+    private static final int COL_PATTERN_IDX_NOT     = 32;
+    private static final int COL_PATTERN_IDX_UNIQUE  = 33;
+    private static final int COL_PATTERN_IDX_UNIQUE_CONS = 34;
+    private static final int COL_PATTERN_IDX_UNIQUE_CONS_NAME = 35;
 
     private static final Pattern UNIQUE_PATTERN = Pattern.compile("(,(([\\s]*constraint[\\s]+([a-zA-Z]+[0-9a-zA-Z_]*))?[\\s]*unique[\\s]*\\((" + REGEX_COLNAME + "([\\s]*,[\\s]*" + REGEX_COLNAME + ")*)\\)))");
     private static final int UNIQUE_PATTERN_IDX_UNIQUE_FULL = 2;
@@ -1273,7 +1273,7 @@ public class CreateDDL {
 
         while (colMatcher.find(idx)) {
             String type = colMatcher.group(COL_PATTERN_IDX_TYPE);
-            if (type.toLowerCase().contains("clob")) {
+            if (type.toLowerCase().contains("clob") || type.toLowerCase().contains("text")) {
                 lobColumns.add(colMatcher.group(COL_PATTERN_IDX_COLNAME).toLowerCase());
             }
             idx = colMatcher.end();
