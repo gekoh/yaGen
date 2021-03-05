@@ -31,4 +31,5 @@ public @interface Sequence {
     int startWith() default 1;
     int incrementBy() default 1;
     int cache() default 1;
+    boolean order() default false;
 }

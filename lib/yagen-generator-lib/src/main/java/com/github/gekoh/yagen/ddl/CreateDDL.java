@@ -564,6 +564,9 @@ public class CreateDDL {
             if (sequence.cache() > 1) {
                 buf.append(" cache ").append(sequence.cache());
             }
+            if (sequence.order()) {
+                buf.append(" order");
+            }
         }
 
         if (supportsPartitioning(dialect) && partitioning != null) {

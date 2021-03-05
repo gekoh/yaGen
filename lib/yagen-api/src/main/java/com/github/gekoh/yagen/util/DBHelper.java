@@ -322,14 +322,23 @@ public class DBHelper {
         return prevUser;
     }
 
+    public static boolean isHsqlDb(EntityManager em) {
+        return isHsqlDb(getDialect(em));
+    }
     public static boolean isHsqlDb(Dialect dialect) {
         return dialectMatches(dialect, "hsql");
     }
 
+    public static boolean isPostgres(EntityManager em) {
+        return isPostgres(getDialect(em));
+    }
     public static boolean isPostgres(Dialect dialect) {
         return dialectMatches(dialect, "postgres");
     }
 
+    public static boolean isOracle(EntityManager em) {
+        return isOracle(getDialect(em));
+    }
     public static boolean isOracle(Dialect dialect) {
         return dialectMatches(dialect, "oracle");
     }
