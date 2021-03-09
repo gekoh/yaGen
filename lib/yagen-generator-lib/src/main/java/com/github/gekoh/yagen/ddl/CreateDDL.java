@@ -558,14 +558,20 @@ public class CreateDDL {
                 checkObjectName(dialect, seqName.toLowerCase());
             }
 
-            buf.append("create sequence ").append(seqName)
-                    .append(" start with ").append(sequence.startWith())
-                    .append(" increment by ").append(sequence.incrementBy());
-            if (sequence.cache() > 1) {
-                buf.append(" cache ").append(sequence.cache());
+            buf.append("create sequence ").append(seqName);
+            
+            if (dialect.supportsPooledSequences()) {
+                buf.append(" start with ").append(sequence.startWith())
+                        .append(" increment by ").append(sequence.incrementBy());
             }
-            if (sequence.order()) {
-                buf.append(" order");
+            
+            if (isOracle(dialect)) {
+                if (sequence.cache() > 1) {
+                    buf.append(" cache ").append(sequence.cache());
+                }
+                if (sequence.order()) {
+                    buf.append(" order");
+                }
             }
         }
 
