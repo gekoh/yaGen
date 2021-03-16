@@ -374,23 +374,6 @@ public class TableConfig {
                     gatherCascade(attr2colName, attrPathField, attributeType);
                 }
 
-                if (fOm.isAnnotationPresent(CascadeNullable.class)) {
-                    if (onDeleteCascade) {
-                        throw new IllegalStateException("conflicting declaration of @CascadeNullable and CascadeType on relation " + fOm);
-                    }
-                    String colName = attr2colName.get(attrPathField);
-                    if (colName == null) {
-                        if (fOm.isAnnotationPresent(JoinColumn.class)) {
-                            colName = getIdentifierForReference(fOm.getAnnotation(JoinColumn.class).name());
-                        }
-
-                        if (StringUtils.isEmpty(colName)) {
-                            colName = getIdentifierForReference(attributeName);
-                        }
-                        columnNamesIsCascadeNullable.add(colName);
-                    }
-                }
-
                 if (fOm.isAnnotationPresent(NoForeignKeyConstraint.class)) {
                     String colName = attr2colName.get(attrPathField);
                     if (colName == null) {
@@ -433,13 +416,16 @@ public class TableConfig {
                     }
                 }
 
-                if (fkTableName != null && (
-                        onDeleteCascade || fOm.isAnnotationPresent(CascadeDelete.class
-                        ))) {
+                if (fkTableName != null) {
                     fkTableName = ddlEnhancer.getProfile().getNamingStrategy().tableName(fkTableName);
                     TableConfig fkConfig = ddlEnhancer.getConfigForTableName(getIdentifierForReference(fkTableName));
                     if (fkConfig != null) {
-                        fkConfig.columnNamesIsCascadeDelete.addAll(fkCols);
+                        if (onDeleteCascade || fOm.isAnnotationPresent(CascadeDelete.class)) {
+                            fkConfig.columnNamesIsCascadeDelete.addAll(fkCols);
+                        }
+                        else if (fOm.isAnnotationPresent(CascadeNullable.class)) {
+                            fkConfig.columnNamesIsCascadeNullable.addAll(fkCols);
+                        }
                     }
                 }
             }
