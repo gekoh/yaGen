@@ -136,6 +136,7 @@ public class CoreDDLGenerator {
             while (msgE != null && msgE.getMessage() == null) {
                 msgE = msgE.getCause();
             }
+            LOG.error("error setting up generator profile", e);
             throw new IllegalStateException("error setting up generator profile: " + (msgE != null && msgE.getMessage() != null ? msgE.getMessage() : e.toString()), e);
         }
 
