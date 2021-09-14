@@ -52,9 +52,9 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -119,7 +119,8 @@ public class DDLGenerator {
 
     public static Collection<Class> getEntityAndMappedSuperClassesFrom(Metadata metadata) {
         List<Class> entityClasses = metadata.getEntityBindings().stream().map(PersistentClass::getMappedClass).collect(Collectors.toList());
-        Set<Class> allClasses = new HashSet<>(entityClasses);
+        entityClasses.sort(Comparator.comparing(Class::getName));
+        Set<Class> allClasses = new LinkedHashSet<>(entityClasses);
         for (Class entityClass : entityClasses) {
             Class superClass = entityClass;
             while ((superClass = superClass.getSuperclass()) != null) {
