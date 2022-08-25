@@ -46,6 +46,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.io.StringWriter;
+import java.lang.reflect.Field;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.time.LocalDateTime;
@@ -93,6 +94,14 @@ public class DDLGenerator {
         public Metadata createSchemaExportMetadata() {
 
             EntityManagerFactory entityManagerFactory = Persistence.createEntityManagerFactory(persistenceUnitName);
+
+            try {
+                Field field = entityManagerFactory.getClass().getDeclaredField("metadata");
+                field.setAccessible(true);
+                return (Metadata) field.get(entityManagerFactory);
+            } catch (Exception ignored) {
+                LOG.warn("unable to get genuine JPA metadata, need to recreate from java entity classes only");
+            }
 
             ServiceRegistry serviceRegistry =
                 new StandardServiceRegistryBuilder()
