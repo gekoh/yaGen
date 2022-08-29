@@ -8,7 +8,7 @@ begin atomic
   declare hst_operation char(1) default '${operation}';
   declare live_rowid varchar(64);
   declare hst_uuid_used varchar(32);
-  declare hst_table_name varchar(30);
+  declare live_table_name varchar(30);
   declare prev_operation char(1);
   declare affected_rowcount integer;
   declare msg varchar(255);
@@ -24,7 +24,7 @@ begin atomic
 -- when using oracle syntax in HSQLDB newer versions seem to override user function sys_guid() with built-in version
 -- which returns binary data and is incompatible with our triggers, thus we specifically use the self created sys_guid
   set hst_uuid_used=public.sys_guid();
-  set hst_table_name=upper('${liveTableName}');
+  set live_table_name=upper('${liveTableName}');
 #if( $bypassFunctionality )
   if not(is_statically_bypassed('${triggerName}')) and is_bypassed(upper('${triggerName}')) = 0 then
 #end
@@ -55,7 +55,7 @@ begin atomic
     begin atomic
       declare exit handler for not found
         begin atomic
-          insert into hst_modified_row values (hst_table_name, live_rowid, hst_operation, hst_uuid_used);
+          insert into hst_modified_row values (live_table_name, live_rowid, hst_operation, '${hstTableName}', hst_uuid_used);
 
 #if (${operation} != 'I')
           /* invalidate latest entry in history table */
@@ -74,7 +74,7 @@ begin atomic
 
           GET DIAGNOSTICS affected_rowcount = ROW_COUNT;
           if affected_rowcount<>1 then
-            set msg='unable to invalidate history record for '||hst_table_name
+            set msg='unable to invalidate history record for '||live_table_name
 #foreach( $pkColumn in $pkColumns )
                 ||' ${pkColumn}='''|| old.${pkColumn} ||''''
 #end
@@ -86,7 +86,7 @@ begin atomic
 
       select operation, hst_uuid into prev_operation, hst_uuid_used
         from hst_modified_row
-       where table_name=hst_table_name
+       where table_name=live_table_name
          and row_id=live_rowid;
 
       if prev_operation='I' and hst_operation='U' then

@@ -11,6 +11,7 @@ create global temporary table HST_MODIFIED_ROW (
   table_name varchar2(30 char),
   row_id rowid,
   operation varchar2(1 char),
+  hst_table_name varchar2(30 char),
   hst_uuid varchar2(32 char),
   constraint hstmod_rowid_tablename_PK primary key (row_id, table_name)
 );
@@ -37,6 +38,7 @@ create global temporary table HST_MODIFIED_ROW (
   table_name varchar(30),
   row_id varchar(64),
   operation char(1),
+  hst_table_name varchar(30),
   hst_uuid varchar(32),
   constraint hstmod_rowid_tablename_PK primary key (row_id, table_name)
 );
@@ -77,6 +79,7 @@ create table HST_MODIFIED_ROW (
     table_name varchar(30),
     row_id tid,
     operation char(1),
+    hst_table_name varchar(30),
     hst_uuid varchar(32),
     constraint hstmod_rowid_tablename_PK primary key (transaction_id, row_id, table_name)
 );

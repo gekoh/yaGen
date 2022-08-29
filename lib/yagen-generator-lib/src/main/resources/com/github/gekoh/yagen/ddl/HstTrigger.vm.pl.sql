@@ -22,7 +22,7 @@ declare
 #end
   hst_uuid_used ${hstTableName}.hst_uuid%TYPE:=sys_guid();
 #if( $MODIFIER_COLUMN_NAME )  hst_modified_by ${MODIFIER_COLUMN_TYPE}:=substr(get_audit_user(null), 1, ${MODIFIER_COLUMN_NAME_LENGTH});
-#end  hst_table_name ${varcharType}:=upper('${liveTableName}');
+#end  live_table_name ${varcharType}:=upper('${liveTableName}');
 begin
 #if( $bypassFunctionality )
   if is_bypassed(upper('${objectName}')) = 1 then
@@ -57,20 +57,20 @@ begin
 #if( !$is_postgres )
     if ${new}.rowid<>${old}.rowid then
       update hst_modified_row set row_id=${new}.rowid
-        where table_name=hst_table_name
+        where table_name=live_table_name
           and row_id=${old}.rowid;
     end if;
 #else
 
     if (hst_operation  = 'U') and ${new}.ctid <> ${old}.ctid then
       update hst_modified_row set row_id=${new}.ctid
-        where transaction_id=txid_current() and table_name=hst_table_name
+        where transaction_id=txid_current() and table_name=live_table_name
           and row_id=${old}.ctid;
     end if;
 #end
 
     begin
-      insert into hst_modified_row values (#if($is_postgres)txid_current(), #{end}hst_table_name, live_rowid, hst_operation, hst_uuid_used);
+      insert into hst_modified_row values (#if($is_postgres)txid_current(), #{end}live_table_name, live_rowid, hst_operation, '${hstTableName}', hst_uuid_used);
 
       if hst_operation<>'I' then
         -- invalidate latest entry in history table
@@ -90,15 +90,54 @@ begin
 #if($is_postgres)
         GET DIAGNOSTICS sql_rowcount = ROW_COUNT;
         if sql_rowcount<>1 then
-#else
-        if sql%rowcount<>1 then
-#end
-#if( $is_postgres )          perform#{end}
-          raise_application_error(-20100, 'unable to invalidate history record for '||hst_table_name
+          perform
+          raise_application_error(-20100, 'unable to invalidate history record for '||live_table_name
 #foreach( $pkColumn in $pkColumns )
               ||' ${pkColumn}='''|| ${old}.${pkColumn} ||''''
 #end
             );
+#else
+        if sql%rowcount<>1 then
+            declare
+                new_transaction_timestamp timestamp;
+            begin
+                new_transaction_timestamp:=systimestamp;
+                update HST_CURRENT_TRANSACTION set transaction_timestamp=new_transaction_timestamp
+                where transaction_id=DBMS_TRANSACTION.LOCAL_TRANSACTION_ID;
+
+                for data in (select HST_TABLE_NAME, HST_UUID from HST_MODIFIED_ROW where HST_UUID<>hst_uuid_used) loop
+
+                    execute immediate 'update '||data.HST_TABLE_NAME||' set transaction_timestamp=:new_ts where hst_uuid=:hst_uuid'
+                      using new_transaction_timestamp, data.HST_UUID;
+                    execute immediate 'update '||data.HST_TABLE_NAME||' h set invalidated_at=:new_ts where transaction_timestamp < :new_ts1 and operation <> ''D'' and invalidated_at = :old_ts'
+                        using new_transaction_timestamp, new_transaction_timestamp, transaction_timestamp_found;
+                end loop;
+
+                transaction_timestamp_found:=new_transaction_timestamp;
+
+                -- finally last try to invalidate latest entry in history table
+                update ${hstTableName} h set invalidated_at=transaction_timestamp_found
+                  where
+                    transaction_timestamp < transaction_timestamp_found and
+                    operation <> 'D' and
+#foreach( $pkColumn in $pkColumns )
+  #if( $!{columnMap.get($pkColumn).nullable} )
+                    ((${pkColumn} is null and ${old}.${pkColumn} is null) or ${pkColumn}=${old}.${pkColumn}) and
+  #else
+                    ${pkColumn}=${old}.${pkColumn} and
+  #end
+#end
+                    invalidated_at is null;
+
+                if sql%rowcount<>1 then
+                  raise_application_error(-20100, 'unable to invalidate history record for '||live_table_name
+#foreach( $pkColumn in $pkColumns )
+                      ||' ${pkColumn}='''|| ${old}.${pkColumn} ||''''
+#end
+                    ||' after rewriting transaction history records with updated timestamp');
+                end if;
+            end;
+#end
         end if;
       end if;
     exception when #if(!$is_postgres)dup_val_on_index#{else}unique_violation#end then
@@ -107,7 +146,7 @@ begin
       begin
         select operation, hst_uuid into #if($is_postgres)strict #{end}prev_operation, hst_uuid_used
           from hst_modified_row
-         where #if($is_postgres)transaction_id=txid_current() and #{end}table_name=hst_table_name
+         where #if($is_postgres)transaction_id=txid_current() and #{end}table_name=live_table_name
            and row_id=live_rowid;
 
         if prev_operation='I' and hst_operation='U' then
