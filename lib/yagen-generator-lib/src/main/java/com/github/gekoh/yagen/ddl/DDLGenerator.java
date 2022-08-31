@@ -25,8 +25,10 @@ import org.apache.velocity.VelocityContext;
 import org.apache.velocity.app.Velocity;
 import org.dom4j.Document;
 import org.dom4j.io.SAXReader;
+import org.hibernate.SessionFactory;
 import org.hibernate.boot.Metadata;
 import org.hibernate.boot.MetadataSources;
+import org.hibernate.boot.model.naming.PhysicalNamingStrategy;
 import org.hibernate.boot.registry.StandardServiceRegistryBuilder;
 import org.hibernate.dialect.Dialect;
 import org.hibernate.mapping.PersistentClass;
@@ -96,9 +98,7 @@ public class DDLGenerator {
             EntityManagerFactory entityManagerFactory = Persistence.createEntityManagerFactory(persistenceUnitName);
 
             try {
-                Field field = entityManagerFactory.getClass().getDeclaredField("metadata");
-                field.setAccessible(true);
-                return (Metadata) field.get(entityManagerFactory);
+                return PatchGlue.extractMetadata((SessionFactory) entityManagerFactory);
             } catch (Exception ignored) {
                 LOG.warn("unable to get genuine JPA metadata, need to recreate from java entity classes only");
             }
@@ -201,6 +201,11 @@ public class DDLGenerator {
         }
 
         public void registerMetadata(Metadata metadata) {
+            PhysicalNamingStrategy namingStrategy = metadata.getDatabase().getPhysicalNamingStrategy();
+            if (namingStrategy instanceof DefaultNamingStrategy) {
+                setNamingStrategy((DefaultNamingStrategy) namingStrategy);
+            }
+
             Collection<Class> entitiesFromMetadata = getEntityAndMappedSuperClassesFrom(metadata);
             entityClasses.addAll(entitiesFromMetadata);
 

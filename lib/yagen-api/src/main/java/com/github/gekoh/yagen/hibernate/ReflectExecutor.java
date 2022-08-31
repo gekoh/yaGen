@@ -42,8 +42,6 @@ public class ReflectExecutor {
     static final Initializer<Constructor> i_profile = getConstructor(PROFILE_CLASS_NAME);
 
     static final Initializer<Method> m_registerMetadata = getMethod(PROFILE_CLASS_NAME + ".registerMetadata");
-    static final Initializer<Method> m_setNamingStrategy   = getMethod(PROFILE_CLASS_NAME + ".setNamingStrategy");
-    static final Initializer<Method> m_clone               = getMethod(PROFILE_CLASS_NAME + ".clone");
     static final Initializer<Method> m_getHeaderStatements = getMethod(PROFILE_CLASS_NAME + ".getHeaderStatements");
     static final Initializer<Method> m_getFooterStatements = getMethod(PROFILE_CLASS_NAME + ".getFooterStatements");
 

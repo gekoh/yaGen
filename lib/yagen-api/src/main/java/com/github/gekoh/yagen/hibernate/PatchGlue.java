@@ -75,7 +75,6 @@ public class PatchGlue {
     public static Object newDDLEnhancer(Object profile, Object metadataObj) {
         try {
             Metadata metadata = (Metadata) metadataObj;
-            ReflectExecutor.m_registerMetadata.get().invoke(profile, metadata);
             return ReflectExecutor.i_createDdl.get().newInstance(profile, metadata.getDatabase().getDialect());
         } catch (Exception e) {
             throw new IllegalStateException(e);
@@ -95,17 +94,8 @@ public class PatchGlue {
     }
 
     public static void initDialect(SessionFactory sessionFactory) {
-        if (!(sessionFactory instanceof SessionFactoryImpl)) {
-            throw new IllegalStateException("expecting SessionFactoryImpl");
-        }
-        SessionFactoryImpl impl = (SessionFactoryImpl) sessionFactory;
-
-        try {
-            Metadata metadata = (Metadata) ReflectExecutor.m_getMetadata.get().invoke(impl);
-            initDialect(createProfile(metadata), metadata);
-        } catch (Exception e) {
-            throw new IllegalStateException(e);
-        }
+        Metadata metadata = extractMetadata(sessionFactory);
+        initDialect(createProfile(metadata), metadata);
     }
 
     public static void initDialect(Object profile, Metadata metadata) {
@@ -113,20 +103,27 @@ public class PatchGlue {
 
         if (dialect != null && ReflectExecutor.c_enhancer.get().isAssignableFrom(dialect.getClass())) {
             try {
-                PhysicalNamingStrategy namingStrategy = metadata.getDatabase().getPhysicalNamingStrategy();
-
-                if (namingStrategy instanceof DefaultNamingStrategy) {
-                    ReflectExecutor.m_setNamingStrategy.get().invoke(profile, namingStrategy);
-                }
-                if (ReflectExecutor.m_getDDLEnhancer.get().invoke(dialect) == null) {
-                    ReflectExecutor.m_initDDLEnhancer.get().invoke(dialect, profile, metadata);
-                }
+                ReflectExecutor.m_registerMetadata.get().invoke(profile, metadata);
+                ReflectExecutor.m_initDDLEnhancer.get().invoke(dialect, profile, metadata);
             } catch (Exception e) {
                 throw new IllegalStateException(e);
             }
         }
         else {
             LOG.warn("{} was not patched, generator enhancements not working", dialect != null ? dialect.getClass().getName() : "Dialect");
+        }
+    }
+
+    public static Metadata extractMetadata(SessionFactory sessionFactory) {
+        if (!(sessionFactory instanceof SessionFactoryImpl)) {
+            throw new IllegalStateException("expecting SessionFactoryImpl");
+        }
+        SessionFactoryImpl impl = (SessionFactoryImpl) sessionFactory;
+
+        try {
+            return (Metadata) ReflectExecutor.m_getMetadata.get().invoke(impl);
+        } catch (Exception e) {
+            throw new IllegalStateException(e);
         }
     }
 

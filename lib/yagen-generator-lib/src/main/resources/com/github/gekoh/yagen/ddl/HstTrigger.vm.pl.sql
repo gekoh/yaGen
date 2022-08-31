@@ -98,45 +98,29 @@ begin
             );
 #else
         if sql%rowcount<>1 then
-            declare
-                new_transaction_timestamp timestamp;
-            begin
-                new_transaction_timestamp:=systimestamp;
-                update HST_CURRENT_TRANSACTION set transaction_timestamp=new_transaction_timestamp
-                where transaction_id=DBMS_TRANSACTION.LOCAL_TRANSACTION_ID;
+            transaction_timestamp_found:=update_transaction_timestamp(hst_uuid_used);
 
-                for data in (select HST_TABLE_NAME, HST_UUID from HST_MODIFIED_ROW where HST_UUID<>hst_uuid_used) loop
-
-                    execute immediate 'update '||data.HST_TABLE_NAME||' set transaction_timestamp=:new_ts where hst_uuid=:hst_uuid'
-                      using new_transaction_timestamp, data.HST_UUID;
-                    execute immediate 'update '||data.HST_TABLE_NAME||' h set invalidated_at=:new_ts where transaction_timestamp < :new_ts1 and operation <> ''D'' and invalidated_at = :old_ts'
-                        using new_transaction_timestamp, new_transaction_timestamp, transaction_timestamp_found;
-                end loop;
-
-                transaction_timestamp_found:=new_transaction_timestamp;
-
-                -- finally last try to invalidate latest entry in history table
-                update ${hstTableName} h set invalidated_at=transaction_timestamp_found
-                  where
-                    transaction_timestamp < transaction_timestamp_found and
-                    operation <> 'D' and
+            -- finally last try to invalidate latest entry in history table
+            update ${hstTableName} h set invalidated_at=transaction_timestamp_found
+              where
+                transaction_timestamp < transaction_timestamp_found and
+                operation <> 'D' and
 #foreach( $pkColumn in $pkColumns )
-  #if( $!{columnMap.get($pkColumn).nullable} )
-                    ((${pkColumn} is null and ${old}.${pkColumn} is null) or ${pkColumn}=${old}.${pkColumn}) and
-  #else
-                    ${pkColumn}=${old}.${pkColumn} and
-  #end
+#if( $!{columnMap.get($pkColumn).nullable} )
+                ((${pkColumn} is null and ${old}.${pkColumn} is null) or ${pkColumn}=${old}.${pkColumn}) and
+#else
+                ${pkColumn}=${old}.${pkColumn} and
 #end
-                    invalidated_at is null;
+#end
+                invalidated_at is null;
 
-                if sql%rowcount<>1 then
-                  raise_application_error(-20100, 'unable to invalidate history record for '||live_table_name
+            if sql%rowcount<>1 then
+              raise_application_error(-20100, 'unable to invalidate history record for '||live_table_name
 #foreach( $pkColumn in $pkColumns )
-                      ||' ${pkColumn}='''|| ${old}.${pkColumn} ||''''
+                  ||' ${pkColumn}='''|| ${old}.${pkColumn} ||''''
 #end
-                    ||' after rewriting transaction history records with updated timestamp');
-                end if;
-            end;
+                ||' after rewriting transaction history records with updated timestamp');
+            end if;
 #end
         end if;
       end if;
