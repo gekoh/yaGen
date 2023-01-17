@@ -153,7 +153,7 @@ recursive changeset_tree (PRECURSOR_CHANGESET_UUID, UUID, CHANGESET_STATUS) AS (
         DSM_CHANGESET s
         join changeset_tree t on s.PRECURSOR_CHANGESET_UUID=t.UUID
 )
-select l.*, rownum() as row_nr
+select l.*, #if( $is_postgres )row_number() over()#{else}rownum()#{end} as row_nr
 from
     dsm_changelog l
     join changeset_tree s on l.CHANGESET_UUID=s.uuid

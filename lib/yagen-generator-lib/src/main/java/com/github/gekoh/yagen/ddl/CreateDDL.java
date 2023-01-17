@@ -1282,7 +1282,7 @@ public class CreateDDL {
 
         while (colMatcher.find(idx)) {
             String type = colMatcher.group(COL_PATTERN_IDX_TYPE);
-            if (type.toLowerCase().contains("clob") || type.toLowerCase().contains("text")) {
+            if (type.toLowerCase().contains("lob") || type.toLowerCase().contains("text") || type.toLowerCase().contains("longvarchar")) {
                 lobColumns.add(colMatcher.group(COL_PATTERN_IDX_COLNAME).toLowerCase());
             }
             idx = colMatcher.end();

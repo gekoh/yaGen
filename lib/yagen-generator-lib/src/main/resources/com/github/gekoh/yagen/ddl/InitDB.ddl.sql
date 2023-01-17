@@ -164,6 +164,13 @@ end;
 $$ LANGUAGE PLPGSQL;
 
 ------- CreateDDL statement separator -------
+CREATE FUNCTION systimestamp() RETURNS timestamp AS $$
+begin
+    return clock_timestamp();
+end;
+$$ LANGUAGE PLPGSQL;
+
+------- CreateDDL statement separator -------
 CREATE FUNCTION raise_application_error(code int, message varchar) RETURNS void AS $$
 begin
     raise exception '%: %', code, message using errcode = abs(code)::varchar;
