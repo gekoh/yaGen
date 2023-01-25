@@ -171,6 +171,13 @@ end;
 $$ LANGUAGE PLPGSQL;
 
 ------- CreateDDL statement separator -------
+CREATE FUNCTION sysdate() RETURNS timestamp AS $$
+begin
+return clock_timestamp();
+end;
+$$ LANGUAGE PLPGSQL;
+
+------- CreateDDL statement separator -------
 CREATE FUNCTION raise_application_error(code int, message varchar) RETURNS void AS $$
 begin
     raise exception '%: %', code, message using errcode = abs(code)::varchar;
@@ -212,11 +219,12 @@ begin
              '^(.*)@.*$', '\1'),
              '^.*CN=([^, ]*).*$', '\1'),
     1, 20);
-  return user || case when user_name is not null and lower(user) <> lower(user_name) then ' ('||user_name||')' end;
+  return user || case when user_name is not null and lower(user) <> lower(user_name) then ' ('||user_name||')' else '' end;
 end;
 $$ LANGUAGE PLPGSQL;
 
 #if( $bypassFunctionality )
+
 ------- CreateDDL statement separator -------
 CREATE FUNCTION is_bypassed(object_name varchar) RETURNS NUMERIC AS $$
 declare bypass_regex varchar(255);
@@ -241,6 +249,13 @@ CREATE VIEW dual AS
 ;
 
 ------- CreateDDL statement separator -------
+CREATE FUNCTION ora_hash(text_in in VARCHAR) RETURNS NUMERIC AS $$
+BEGIN
+return hashtext(text_in);
+END;
+$$ LANGUAGE 'plpgsql';
+
+------- CreateDDL statement separator -------
 CREATE FUNCTION audit_trigger_function()
   RETURNS trigger AS $$
 BEGIN
@@ -252,18 +267,46 @@ BEGIN
 #end
     if TG_OP = 'INSERT' then
         new.created_at := localtimestamp;
-        new.created_by := coalesce(new.created_by, sys_context('USERENV','CLIENT_IDENTIFIER'), sys_context('USERENV','OS_USER'), user);
+        new.created_by := get_audit_user(new.created_by);
         new.last_modified_at := null;
         new.last_modified_by := null;
     elsif TG_OP = 'UPDATE' then
         new.created_at := old.created_at;
         new.created_by := old.created_by;
         if not(new.last_modified_at is not null and (old.last_modified_at is null or new.last_modified_at <> old.last_modified_at )) then
-          new.last_modified_by := coalesce(sys_context('USERENV','CLIENT_IDENTIFIER'), sys_context('USERENV','OS_USER'), user);
+          new.last_modified_by := get_audit_user(cast(user as varchar));
         end if;
         new.last_modified_at := localtimestamp;
     end if;
     return new;
+END;
+$$ LANGUAGE 'plpgsql';
+
+------- CreateDDL statement separator -------
+CREATE FUNCTION audit_trigger_function_single()
+    RETURNS trigger AS $$
+declare
+  last_modified_at_colname varchar;
+  last_modified_by_colname varchar;
+BEGIN
+#if( $bypassFunctionality )
+    if is_bypassed(upper(tg_table_name)) = 1 then
+        return new;
+end if;
+
+#end
+    if TG_NARGS > 0 then
+        last_modified_at_colname := TG_ARGV[0];
+    end if;
+    if TG_NARGS > 1 then
+        last_modified_by_colname := TG_ARGV[1];
+    end if;
+    -- dynamic column names not yet supported, only detect if last_modified_by is existing
+    if last_modified_by_colname is not null then
+        new.last_modified_by := get_audit_user(new.last_modified_by);
+    end if;
+    new.last_modified_at := localtimestamp;
+return new;
 END;
 $$ LANGUAGE 'plpgsql';
 

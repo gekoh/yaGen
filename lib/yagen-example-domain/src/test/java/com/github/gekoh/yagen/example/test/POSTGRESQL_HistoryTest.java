@@ -21,6 +21,7 @@ import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.IOException;
+import java.time.Duration;
 
 /**
  * @author Mario Ivankovits
@@ -39,6 +40,7 @@ public class POSTGRESQL_HistoryTest extends HistoryTest {
             pg = EmbeddedPostgres.builder()
                     .setCleanDataDirectory(true)
                     .setPort(9002)
+                    .setPGStartupWait(Duration.ofSeconds(20L))
                     .start();
         } catch (IOException e) {
             throw new RuntimeException(e);

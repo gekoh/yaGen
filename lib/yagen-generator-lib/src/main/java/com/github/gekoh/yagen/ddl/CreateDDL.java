@@ -612,6 +612,7 @@ public class CreateDDL {
 
                 int idx=0;
                 for (String layeredTableName : layeredTablesView.tableNamesInOrder()) {
+                    addDropStatement(nameLC, "drop table " + getNameAndIfExistsWhenSupported(dialect, nameLC));
                     addIndexes(buf, dialect, tableConfig, layeredTableName, ""+ (++idx));
                 }
             }
@@ -1328,10 +1329,12 @@ public class CreateDDL {
         TableConfig tableConfig = tblNameToConfig.get(nameLC);
 
         String templateName = "AuditTrigger";
+        boolean singleTimestamp = false;
 
         if (!columns.containsAll(AUDIT_COLUMNS)) {
             if (tableConfig != null && tableConfig.getTableAnnotationOfType(Auditable.class) != null && columns.contains(AuditInfo.LAST_MODIFIED_AT)) {
                 templateName += "SingleTimestamp";
+                singleTimestamp = true;
             }
             else {
                 return;
@@ -1343,8 +1346,7 @@ public class CreateDDL {
         }
 
         if (isPostgres(dialect)) {
-            // TODO: single audit timestamp for postgres
-            writePostgreSqlAuditTrigger(dialect, buf, nameLC);
+            writePostgreSqlAuditTrigger(dialect, buf, nameLC, singleTimestamp, columns);
             return;
         }
 
@@ -1380,7 +1382,7 @@ public class CreateDDL {
         }
     }
 
-    private void writePostgreSqlAuditTrigger(Dialect dialect, StringBuffer buf, String tableNameLC) {
+    private void writePostgreSqlAuditTrigger(Dialect dialect, StringBuffer buf, String tableNameLC, boolean singleTimestamp, Set<String> columns) {
         String triggerName = getProfile().getNamingStrategy().triggerName(getEntityClassName(tableNameLC), tableNameLC, null, Constants._ATR);
 
         if (triggerName.length() > CreateDDL.MAX_LEN_OBJECT_NAME) {
@@ -1393,7 +1395,18 @@ public class CreateDDL {
                 .append("create trigger ").append(triggerName).append("\n")
                 .append("before insert or update on ").append(tableNameLC).append("\n")
                 .append("for each row\n")
-                .append("execute procedure audit_trigger_function()");
+                .append("execute procedure ");
+
+        if (singleTimestamp) {
+            buf.append("audit_trigger_function_single('").append(AuditInfo.LAST_MODIFIED_AT).append("'");
+            if (columns.contains(AuditInfo.LAST_MODIFIED_BY)) {
+                buf.append(", '").append(AuditInfo.LAST_MODIFIED_BY).append("'");
+            }
+            buf.append(")");
+        }
+        else {
+            buf.append("audit_trigger_function()");
+        }
     }
 
     private void writeOracleAuditTrigger(Dialect dialect, StringBuffer buf, VelocityContext context, String tableNameLC, String templateName) {
@@ -1793,7 +1806,7 @@ public class CreateDDL {
             if (pkMatcher.find()) {
                 StringBuilder sb = new StringBuilder();
                 sb.append(sqlCreate.substring(0, pkMatcher.start(TBL_PATTERN_IDX_AFTER_COL_DEF)));
-                sb.append(", ").append(partColName).append(" date default sysdate");
+                sb.append(", ").append(partColName).append(" date default sysdate()");
                 sb.append(sqlCreate.substring(pkMatcher.start(TBL_PATTERN_IDX_AFTER_COL_DEF)));
                 sqlCreate = sb.toString();
                 columns.add(partColName);
@@ -2316,10 +2329,13 @@ public class CreateDDL {
         }
 
         views = new HashSet<String>(externalViews);
-//        Add all i18n view names
+//        Add all i18n view names and layered base table names which actually are implemented as views
         for (TableConfig tableConfig : tblNameToConfig.values()) {
             if (tableConfig.getI18nBaseEntityTblName() != null) {
-                views.add(tableConfig.getI18nBaseEntityTblName());
+                views.add(tableConfig.getI18nBaseEntityTblName().toLowerCase());
+            }
+            else if (tableConfig.getTableAnnotationOfType(LayeredTablesView.class) != null) {
+                views.add(tableConfig.getTableName().toLowerCase());
             }
         }
 
