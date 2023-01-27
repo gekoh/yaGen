@@ -23,4 +23,9 @@ public class DefaultOracle10gDialect extends Oracle10gDialect {
         super.contributeTypes(typeContributions, serviceRegistry);
         typeContributions.contributeType(new BitBooleanType());
     }
+
+    @Override
+    public String getCurrentTimestampSQLFunctionName() {
+        return "systimestamp";
+    }
 }

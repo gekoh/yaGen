@@ -20,6 +20,7 @@ import com.github.gekoh.yagen.api.Auditable;
 import com.github.gekoh.yagen.api.Changelog;
 import com.github.gekoh.yagen.api.CheckConstraint;
 import com.github.gekoh.yagen.api.Constants;
+import com.github.gekoh.yagen.api.Default;
 import com.github.gekoh.yagen.api.DefaultNamingStrategy;
 import com.github.gekoh.yagen.api.Deferrable;
 import com.github.gekoh.yagen.api.Generated;
@@ -580,7 +581,7 @@ public class CreateDDL {
         }
 
         sqlCreate = addConstraintsAndNames(dialect, buf, sqlCreate, nameLC, tableConfig.getColumnNameToEnumCheckConstraints());
-        sqlCreate = addDefaultValues(sqlCreate, nameLC);
+        sqlCreate = addDefaultValues(dialect, sqlCreate, nameLC);
 
         Changelog changelog = tableConfig.getTableAnnotationOfType(Changelog.class);
         if (changelog != null && StringUtils.isNotEmpty(changelog.timelineViewName())) {
@@ -1171,7 +1172,7 @@ public class CreateDDL {
         return context;
     }
 
-    private String addDefaultValues(String sqlCreate, String nameLC) {
+    private String addDefaultValues(Dialect dialect, String sqlCreate, String nameLC) {
         TableConfig tableConfig = tblNameToConfig.get(nameLC);
 
         if (tableConfig == null) {
@@ -1186,9 +1187,11 @@ public class CreateDDL {
             String colName = TableConfig.getIdentifierForReference(matcher.group(COL_PATTERN_IDX_COLNAME));
 
             if (matcher.group(COL_PATTERN_IDX_DEFAULT) == null) {
-                String defaultExpr = tableConfig.getColNameToDefault().get(colName);
+                Default defAnn = tableConfig.getColNameToDefault().get(colName);
 
-                if (defaultExpr != null) {
+                if (defAnn != null) {
+                    String defaultExpr = defAnn.currentTimestamp() ? dialect.getCurrentTimestampSQLFunctionName() : defAnn.sqlExpression();
+
                     b.append(sqlCreate.substring(idx, matcher.end(COL_PATTERN_IDX_TYPE)));
                     b.append(" default ").append(defaultExpr);
                     idx = matcher.end(COL_PATTERN_IDX_TYPE);

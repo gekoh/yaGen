@@ -25,5 +25,5 @@ begin
 
   :new.${last_modified_by} := substr(get_audit_user(user_name), 1, ${MODIFIER_COLUMN_NAME_LENGTH});
 #end
-  :new.${last_modified_at} := systimestamp();
+  :new.${last_modified_at} := systimestamp;
 end;

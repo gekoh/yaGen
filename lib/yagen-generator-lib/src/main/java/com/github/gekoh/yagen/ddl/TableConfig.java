@@ -111,7 +111,7 @@ public class TableConfig {
     private Set<String> columnNamesIsCascadeDelete = new HashSet<String>();
     private Set<String> columnNamesIsCascadeNullable = new HashSet<String>();
     private Set<String> columnNamesIsNoFK = new HashSet<String>();
-    private Map<String, String> colNameToDefault = new HashMap<String, String>();
+    private Map<String, Default> colNameToDefault = new HashMap<String, Default>();
     private String i18nBaseEntityFkCol;
     private String i18nBaseEntityTblName;
 
@@ -278,7 +278,7 @@ public class TableConfig {
         return columnNamesIsNoFK;
     }
 
-    public Map<String, String> getColNameToDefault() {
+    public Map<String, Default> getColNameToDefault() {
         return colNameToDefault;
     }
 
@@ -827,12 +827,11 @@ public class TableConfig {
             }
 
             if (fieldOrMethod.isAnnotationPresent(Default.class)) {
-                String defaultValue = fieldOrMethod.getAnnotation(Default.class).sqlExpression();
                 if (fieldOrMethod.isAnnotationPresent(Column.class)) {
-                    colNameToDefault.put(getIdentifierForReference(fieldOrMethod.getAnnotation(Column.class).name()), defaultValue);
+                    colNameToDefault.put(getIdentifierForReference(fieldOrMethod.getAnnotation(Column.class).name()), fieldOrMethod.getAnnotation(Default.class));
                 }
                 else if (fieldOrMethod instanceof Field) {
-                    colNameToDefault.put(getIdentifierForReference(ddlEnhancer.getProfile().getNamingStrategy().columnName(((Field) fieldOrMethod).getName())), defaultValue);
+                    colNameToDefault.put(getIdentifierForReference(ddlEnhancer.getProfile().getNamingStrategy().columnName(((Field) fieldOrMethod).getName())), fieldOrMethod.getAnnotation(Default.class));
                 }
                 else {
                     LOG.warn(Default.class+" only supported on fields or @{} annotated methods", Column.class.toString());
