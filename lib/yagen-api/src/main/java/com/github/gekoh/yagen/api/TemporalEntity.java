@@ -30,4 +30,5 @@ public @interface TemporalEntity {
     String historyTableName() default "";
     String historyTimestampColumnName() default "TRANSACTION_TIMESTAMP";
     String[] ignoreChangeOfColumns() default {};
+    String latestSnapshotViewName() default "";
 }

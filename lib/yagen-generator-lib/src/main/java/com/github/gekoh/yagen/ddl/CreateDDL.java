@@ -542,6 +542,11 @@ public class CreateDDL {
                 else {
                     buf.append(getHsqlDBHistTriggerSql(dialect, liveTableName, histTableName, histColNameLC, columnNames, pkCols, historyRelevantCols, columnMap));
                 }
+
+                if (StringUtils.isNotEmpty(temporalEntity.latestSnapshotViewName())) {
+                    buf.append(STATEMENT_SEPARATOR);
+                    buf.append(getLatestSnapshotViewSql(dialect, temporalEntity.latestSnapshotViewName(), histTableName, histColNameLC, columnNames, pkCols, historyRelevantCols, columnMap));
+                }
             } catch (ClassNotFoundException e) {
                 LOG.info("not generating history table of live table {} since corresponding history entity class not found in classpath", nameLC);
             }
@@ -1809,7 +1814,7 @@ public class CreateDDL {
             if (pkMatcher.find()) {
                 StringBuilder sb = new StringBuilder();
                 sb.append(sqlCreate.substring(0, pkMatcher.start(TBL_PATTERN_IDX_AFTER_COL_DEF)));
-                sb.append(", ").append(partColName).append(" date default sysdate()");
+                sb.append(", ").append(partColName).append(" date default f_sysdate()");
                 sb.append(sqlCreate.substring(pkMatcher.start(TBL_PATTERN_IDX_AFTER_COL_DEF)));
                 sqlCreate = sb.toString();
                 columns.add(partColName);
@@ -2100,6 +2105,50 @@ public class CreateDDL {
         }
 
         return wr.toString();
+    }
+
+    private String getLatestSnapshotViewSql (Dialect dialect,
+                                            String viewName,
+                                            String histTableName,
+                                            String histColName,
+                                            Set<String> columns,
+                                            List<String> pkColumns,
+                                            List<String> histRelevantCols,
+                                            Map<String, Column> columnMap) {
+        VelocityContext context = newVelocityContext(dialect);
+
+        viewName = getProfile().getNamingStrategy().tableName(viewName);
+        checkObjectName(dialect, viewName);
+
+        Set<String> nonPkColumns = getNonPkCols(columns, pkColumns);
+
+        context.put("VERSION_COLUMN_NAME", VERSION_COLUMN_NAME);
+        if (columns.contains(AuditInfo.LAST_MODIFIED_BY)) {
+            context.put("MODIFIER_COLUMN_NAME", AuditInfo.LAST_MODIFIED_BY);
+            context.put("MODIFIER_COLUMN_NAME_LENGTH", Constants.USER_NAME_LEN);
+            context.put("MODIFIER_COLUMN_TYPE", dialect.getTypeName(Types.VARCHAR, Constants.USER_NAME_LEN, 0, 0));
+        }
+        context.put("objectName", viewName);
+        context.put("hstTableName", histTableName);
+        context.put("columns", columns);
+        context.put("histColName", histColName);
+        context.put("pkColumns", pkColumns);
+        context.put("nonPkColumns", nonPkColumns);
+        context.put("histRelevantCols", histRelevantCols);
+        context.put("columnMap", columnMap);
+        context.put("timestampType", dialect.getTypeName(Types.TIMESTAMP, 0, 0, 0));
+
+        StringWriter objWr = new StringWriter();
+
+        mergeTemplateFromResource("LatestSnapshotView.vm.pl.sql", objWr, context);
+
+        String object = objWr.toString();
+
+        if (dbObjects != null) {
+            dbObjects.add(object);
+        }
+
+        return object;
     }
 
     private Set<String> getNonPkCols(Set<String> columns, List<String> pkColumns) {

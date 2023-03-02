@@ -556,6 +556,10 @@ public class TableConfig {
             public Class<? extends Annotation> annotationType() {
                 return TemporalEntity.class;
             }
+
+            public String latestSnapshotViewName() {
+                return "";
+            }
         });
         TableConfig hstTableConfig = TableConfig.add(ddlEnhancer, historyTableName != null ? historyTableName : tableName + Constants._HST);
         ddlEnhancer.addTableConfig(hstTableConfig);

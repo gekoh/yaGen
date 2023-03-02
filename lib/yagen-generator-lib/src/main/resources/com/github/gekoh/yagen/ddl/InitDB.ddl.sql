@@ -1,6 +1,7 @@
 #if( $is_oracle )
 ------- CreateDDL statement separator -------
-create or replace function get_audit_user(client_user_in in varchar2) return varchar2 is
+create or replace function get_audit_user(client_user_in in varchar2) return varchar2
+    AUTHID CURRENT_USER is
   user_name varchar2(50):=substr(client_user_in, 1, 50);
 begin
   if lower(user_name)='unknown' then
@@ -11,6 +12,13 @@ begin
              '^.*CN=([^, ]*).*$', '\1'),
     1, 20);
   return user || case when user_name is not null and lower(user) <> lower(user_name) then ' ('||user_name||')' end;
+end;
+/
+
+------- CreateDDL statement separator -------
+create or replace function f_sysdate return date as
+begin
+    return sysdate;
 end;
 /
 
@@ -74,6 +82,12 @@ begin atomic
   end if;
   return sys_context_internal(namespace, param);
 end;
+
+------- CreateDDL statement separator -------
+CREATE FUNCTION f_sysdate() RETURNS timestamp(9)
+  LANGUAGE JAVA DETERMINISTIC NO SQL
+  EXTERNAL NAME 'CLASSPATH:com.github.gekoh.yagen.util.DBHelper.getCurrentTimestamp'
+;
 
 ------- CreateDDL statement separator -------
 CREATE FUNCTION systimestamp_9() RETURNS timestamp(9)
@@ -171,7 +185,7 @@ end;
 $$ LANGUAGE PLPGSQL;
 
 ------- CreateDDL statement separator -------
-CREATE FUNCTION sysdate() RETURNS timestamp AS $$
+CREATE FUNCTION f_sysdate() RETURNS timestamp AS $$
 begin
 return clock_timestamp();
 end;
