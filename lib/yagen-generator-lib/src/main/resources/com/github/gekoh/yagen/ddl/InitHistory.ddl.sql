@@ -41,6 +41,10 @@ begin
 
         execute immediate 'update '||data.HST_TABLE_NAME||' set transaction_timestamp=:new_ts where hst_uuid=:hst_uuid'
           using new_transaction_timestamp, data.HST_UUID;
+    end loop;
+
+    for data in (select distinct HST_TABLE_NAME from HST_MODIFIED_ROW where HST_UUID<>exclude_hst_uuid_in) loop
+
         execute immediate 'update '||data.HST_TABLE_NAME||' h set invalidated_at=:new_ts where transaction_timestamp < :new_ts1 and operation <> ''D'' and invalidated_at = :old_ts'
             using new_transaction_timestamp, new_transaction_timestamp, transaction_timestamp_found;
     end loop;
