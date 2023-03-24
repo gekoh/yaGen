@@ -308,7 +308,7 @@ public class MappingUtils {
         return oracleEm.createNativeQuery(
                 "SELECT table_name\n" +
                         "FROM (\n" +
-                        "  SELECT table_name, " + (topDown ? "max" : "min" ) + "(lvl) lvl\n" +
+                        "  SELECT table_name, max(lvl) lvl\n" +
                         "  FROM (\n" +
                         "    WITH \n" +
                         "    fk AS (\n" +
