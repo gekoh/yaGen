@@ -98,6 +98,11 @@ public class FieldInfo {
         isLob = anLob;
     }
 
+    public FieldInfo(Class type, String name, String columnName, int columnLength, JoinColumn joinColumn) {
+        this(type, name, !isCollection(type) ? "@" + Column.class.getName() + "(name = \"" + escapeAttributeValue(columnName) + "\", length = " + columnLength + ", insertable = " + joinColumn.insertable() + ", updatable = " + joinColumn.updatable() + ")" : null);
+        this.columnName = columnName.toLowerCase();
+    }
+
     public FieldInfo(Class type, String name, String columnName, int columnLength) {
         this(type, name, !isCollection(type) ? "@" + Column.class.getName() + "(name = \"" + escapeAttributeValue(columnName) + "\", length = " + columnLength + ")" : null);
         this.columnName = columnName.toLowerCase();
@@ -521,8 +526,9 @@ public class FieldInfo {
     public static List<FieldInfo> convertInverseFKs (List<AccessibleObject> inverseFKfieldsOrMethods) {
         List<FieldInfo> fields = new ArrayList<FieldInfo>();
         for (AccessibleObject inverseFK : inverseFKfieldsOrMethods) {
-            String joinColName = inverseFK.getAnnotation(JoinColumn.class).name();
-            fields.add(new FieldInfo(String.class, toCamelCase("INV_FK_"+joinColName), joinColName, Constants.UUID_LEN));
+            JoinColumn joinColumn = inverseFK.getAnnotation(JoinColumn.class);
+            String joinColName = joinColumn.name();
+            fields.add(new FieldInfo(String.class, toCamelCase("INV_FK_"+joinColName), joinColName, Constants.UUID_LEN, joinColumn));
         }
         return fields;
     }
