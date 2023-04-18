@@ -33,7 +33,7 @@
     <parent>
         <groupId>com.github.gekoh.yagen</groupId>
         <artifactId>yagen-master</artifactId>
-        <version>5.19</version>
+        <version>5.20-SNAPSHOT</version>
         <relativePath>../..</relativePath>
     </parent>
 
