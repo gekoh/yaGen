@@ -28,6 +28,7 @@ import org.hibernate.service.ServiceRegistry;
 import javax.persistence.EntityManager;
 import javax.persistence.NoResultException;
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.sql.CallableStatement;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -380,12 +381,35 @@ public class DBHelper {
         }
 
         Map configurationValues = getConfigurationValues(metadata);
-        if (configurationValues != null) {
-            return (String) configurationValues.get("hibernate.connection.driver_class");
-        }
-        LOG.warn("cannot detect jdbc driver name");
-        return null;
+        return configurationValues != null ? tryGetDriverNameFromDataSource(configurationValues) : null;
     }
+
+    private static Method basicDataSourceGetDriverClassNameMethod = null;
+    private static boolean basicDataSourceGetDriverClassNameMethodInitDone = false;
+
+    private static String tryGetDriverNameFromDataSource(Map properties) {
+        String driverName = (String) properties.get("hibernate.connection.driver_class");
+        if (driverName == null) {
+            if (!basicDataSourceGetDriverClassNameMethodInitDone) {
+                basicDataSourceGetDriverClassNameMethodInitDone = true;
+                try {
+                    basicDataSourceGetDriverClassNameMethod =
+                            Class.forName("org.apache.commons.dbcp.BasicDataSource").getMethod("getDriverClassName");
+                } catch (Exception ex) {
+                    return null;
+                }
+            }
+            if (basicDataSourceGetDriverClassNameMethod != null) {
+                try {
+                    return (String) basicDataSourceGetDriverClassNameMethod.invoke(properties.get("hibernate.connection.datasource"));
+                } catch (Exception ex) {
+                    return null;
+                }
+            }
+        }
+        return driverName;
+    }
+
 
     public static Map getConfigurationValues(Metadata metadata) {
         ServiceRegistry serviceRegistry = metadata.getDatabase().getServiceRegistry();
