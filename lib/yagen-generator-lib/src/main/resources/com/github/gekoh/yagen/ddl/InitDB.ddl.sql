@@ -11,7 +11,7 @@ begin
              '^(.*)@.*$', '\1'),
              '^.*CN=([^, ]*).*$', '\1'),
     1, 20);
-  return user || case when user_name is not null and lower(user) <> lower(user_name) then ' ('||user_name||')' end;
+  return user || case when user_name is not null and lower(user) <> lower(user_name) then ' ('||user_name||')' else '' end;
 end;
 /
 
@@ -151,7 +151,7 @@ begin atomic
     '^(.*)@.*$', '\1'),
     '^.*CN=([^, ]*).*$', '\1'),
     1, 20);
-  return user || case when user_name is not null and lower(user) <> lower(user_name) then ' ('||user_name||')' end;
+  return user || case when user_name is not null and lower(user) <> lower(user_name) then ' ('||user_name||')' else '' end;
 end;
 #end
 
