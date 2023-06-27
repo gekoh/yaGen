@@ -55,7 +55,7 @@ public class FieldInfo {
 
     private static Pattern NULLABLE_PATTERN = Pattern.compile("nullable=((true)|(false))");
     private static Pattern UNIQUE_PATTERN = Pattern.compile("unique=((true)|(false))");
-    private static Pattern STRING_ATTR_PATTERN = Pattern.compile("[\\(|\\s*](name|columnDefinition|type)=([^\\s]*)[,\\)]");
+    private static Pattern STRING_ATTR_PATTERN = Pattern.compile("[\\(|\\s*](?<att>(name|columnDefinition|type)=)(?<quot>\"?(?<val>[^\\s\"]*)\"?)[,\\)]");
     private static Pattern INSERTABLE_PATTERN = Pattern.compile("[\\(,]\\s*(insertable\\s*=\\s*(true|false))\\s*[,\\)]");
     private static Pattern UPDATABLE_PATTERN = Pattern.compile("[\\(,]\\s*(updatable\\s*=\\s*(true|false))\\s*[,\\)]");
 
@@ -207,9 +207,9 @@ public class FieldInfo {
         Matcher m = STRING_ATTR_PATTERN.matcher(a);
         int idx = 0;
         while (m.find(idx)) {
-            result.append(a.substring(idx, m.start(2)));
-            result.append("\"").append(escapeAttributeValue(m.group(2))).append("\"");
-            result.append(a.substring(m.end(2), m.end()));
+            result.append(a.substring(idx, m.end("att")));
+            result.append("\"").append(escapeAttributeValue(m.group("val"))).append("\"");
+            result.append(a.substring(m.end("quot"), m.end()));
             idx = m.end();
         }
         result.append(a.substring(idx));

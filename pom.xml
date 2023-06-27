@@ -52,7 +52,6 @@
         <connection>scm:git:git@github.com:gekoh/yaGen.git</connection>
         <developerConnection>scm:git:git@github.com:gekoh/yaGen.git</developerConnection>
         <url>git@github.com:gekoh/yaGen.git</url>
-        <tag>yagen-master-5.9.6</tag>
     </scm>
 
     <modules>
