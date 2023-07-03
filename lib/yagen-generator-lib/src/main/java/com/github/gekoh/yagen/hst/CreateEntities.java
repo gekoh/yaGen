@@ -21,51 +21,20 @@ import com.github.gekoh.yagen.api.NamingStrategy;
 import com.github.gekoh.yagen.api.TemporalEntity;
 import com.github.gekoh.yagen.ddl.CreateDDL;
 import com.github.gekoh.yagen.ddl.DDLGenerator;
+import com.github.gekoh.yagen.ddl.EntityClassesSaxHandler;
 import com.github.gekoh.yagen.util.FieldInfo;
 import com.github.gekoh.yagen.util.MappingUtils;
 import org.apache.commons.lang.StringUtils;
 import org.apache.velocity.VelocityContext;
 import org.apache.velocity.app.Velocity;
-import org.dom4j.Document;
-import org.dom4j.Element;
-import org.dom4j.Node;
-import org.dom4j.io.SAXReader;
 
-import javax.persistence.Column;
-import javax.persistence.DiscriminatorColumn;
-import javax.persistence.DiscriminatorValue;
-import javax.persistence.Entity;
-import javax.persistence.Inheritance;
-import javax.persistence.JoinColumn;
-import javax.persistence.JoinTable;
-import javax.persistence.ManyToMany;
-import javax.persistence.ManyToOne;
-import javax.persistence.MappedSuperclass;
-import javax.persistence.OneToMany;
-import javax.persistence.PrimaryKeyJoinColumn;
-import javax.persistence.Table;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.FileReader;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.Reader;
-import java.io.StringReader;
-import java.io.StringWriter;
+import javax.persistence.*;
+import java.io.*;
 import java.lang.reflect.AccessibleObject;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.nio.charset.StandardCharsets;
+import java.util.*;
 
 /**
  * @author Georg Kohlweiss
@@ -75,7 +44,7 @@ public class CreateEntities {
 
     public static final String HISTORY_ENTITY_SUFFIX = "Hst";
 
-    private Map<String, Object> additionalProperties = new HashMap<String, Object>();
+    private Map<String, Object> additionalProperties = new HashMap<>();
 
     public static void main (String[] args) {
         if (args == null || args.length<1) {
@@ -141,8 +110,8 @@ public class CreateEntities {
     private String template = readClasspathResource("HstTemplate.java.vm");
 
     private Collection<Class> entityClasses;
-    private List<String> createdMappedSuperClasses = new ArrayList<String>();
-    private List<String> createdEntityClasses = new ArrayList<String>();
+    private List<String> createdMappedSuperClasses = new ArrayList<>();
+    private List<String> createdEntityClasses = new ArrayList<>();
 
     private NamingStrategy namingStrategy = new DefaultNamingStrategy();
 
@@ -205,7 +174,7 @@ public class CreateEntities {
                         List<AccessibleObject> fks = inverseFKs.get(mappedClass);
 
                         if (fks == null) {
-                            inverseFKs.put(mappedClass, fks = new ArrayList<AccessibleObject>());
+                            inverseFKs.put(mappedClass, fks = new ArrayList<>());
                         }
 
                         fks.add(fieldOrMethod);
@@ -218,7 +187,7 @@ public class CreateEntities {
     }
 
     private Set<AccessibleObject> getFieldsAndMethods(Class clazz) {
-        Set<AccessibleObject> fieldOrMethods = new HashSet<AccessibleObject>(Arrays.asList(clazz.getDeclaredFields()));
+        Set<AccessibleObject> fieldOrMethods = new HashSet<>(Arrays.asList(clazz.getDeclaredFields()));
         fieldOrMethods.addAll(Arrays.asList(clazz.getDeclaredMethods()));
 
         return fieldOrMethods;
@@ -267,7 +236,7 @@ public class CreateEntities {
         }
         packageName = declaringClass.getPackage().getName();
 
-        List<FieldInfo> fieldInfos = new ArrayList<FieldInfo>();
+        List<FieldInfo> fieldInfos = new ArrayList<>();
 
 //      add join columns to both sides of the relation (assumes we have only one each)
         fieldInfos.add(FieldInfo.getIdFieldInfo(declaringClass, getFieldNameFromReferencingClassName(declaringClass.getSimpleName()), joinTable.joinColumns()[0].name()));
@@ -292,7 +261,7 @@ public class CreateEntities {
                                         Class baseEntity,
                                         Reader template,
                                         List<AccessibleObject> inverseFKs) {
-        List<FieldInfo> fields = new ArrayList<FieldInfo>(FieldInfo.convertFields(baseEntity));
+        List<FieldInfo> fields = new ArrayList<>(FieldInfo.convertFields(baseEntity));
         if (inverseFKs != null) {
             fields.addAll(FieldInfo.convertInverseFKs(inverseFKs));
         }
@@ -443,9 +412,9 @@ public class CreateEntities {
     }
 
     /**
-     * <p>Extracts all entity classes in the given set of persistence.xml files an returns a collection thereof.</p>
+     * <p>Extracts all entity classes and mapped super classes for the given persistenceUnit and returns a collection thereof.</p>
      * @param persistenceUnitName persistence unit managing source entity classes
-     * @return extracted entity classes
+     * @return extracted entity classes including mapped super classes
      */
     private static Collection<Class> scanEntityClasses(String persistenceUnitName) {
 
@@ -453,58 +422,16 @@ public class CreateEntities {
     }
 
     /**
-     * <p>Extracts all entity classes in the given set of persistence.xml files an returns a collection thereof.</p>
+     * <p>Extracts all entity classes in the given set of persistence.xml files and returns a collection thereof.</p>
      * @param persistenceXmlFiles set of persistence.xml files that you want to scan
      * @return extracted entity classes
      */
     private static Collection<Class> extractFromPersistenceXml(String... persistenceXmlFiles) {
         List<Class> entityClasses = new ArrayList<>();
         for (String file : persistenceXmlFiles) {
-            addPersistenceFile(entityClasses, getPersistenceDocument(file));
+            new EntityClassesSaxHandler(entityClasses).parseXmlFileForEntityClasses(file);
         }
         return entityClasses;
-    }
-
-    private static void addPersistenceFile (Collection<Class> entityClasses, Document persistenceXml) {
-        if (persistenceXml==null) {
-            return;
-        }
-        try {
-            Element pu = persistenceXml.getRootElement().element("persistence-unit");
-            if(pu != null) {
-                for (Object classNode: pu.elements("class")) {
-                    entityClasses.add(Class.forName(((Node) classNode).getText()));
-                }
-                for (Object fileNode: pu.elements("mapping-file")) {
-                    addPersistenceFile(entityClasses, getPersistenceDocument(((Node) fileNode).getText()));
-                }
-            } else {
-                for(Object entityNode : persistenceXml.getRootElement().elements("mapped-superclass")) {
-                    entityClasses.add(Class.forName((String) ((Element)entityNode).attribute("class").getData()));
-                }
-                for(Object entityNode : persistenceXml.getRootElement().elements("entity")) {
-                    entityClasses.add(Class.forName((String) ((Element)entityNode).attribute("class").getData()));
-                }
-            }
-        } catch (ClassNotFoundException e) {
-            throw new IllegalArgumentException(e);
-        }
-    }
-
-    private static Document getPersistenceDocument (String persistenceXml) {
-        if (StringUtils.isEmpty(persistenceXml)) {
-            LOG.warn("empty persistence.xml or orm file specified");
-            return null;
-        }
-        try {
-            InputStream resource = CreateEntities.class.getResourceAsStream("/" + persistenceXml);
-            if (resource == null) {
-                resource = new FileInputStream(persistenceXml);
-            }
-            return new SAXReader().read(resource);
-        } catch (Exception e) {
-            throw new IllegalArgumentException("unable to find resource "+persistenceXml+" in classpath or filesystem", e);
-        }
     }
 
     /**
@@ -526,7 +453,7 @@ public class CreateEntities {
         StringWriter wr = new StringWriter();
         
         try {
-            Reader rd = new InputStreamReader(is, "UTF-8");
+            Reader rd = new InputStreamReader(is, StandardCharsets.UTF_8);
             
             char[] buf = new char[1024];
             int read;
