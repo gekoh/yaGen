@@ -79,7 +79,7 @@ yaGen is able to generate entity classes mapped to history tables which in turn 
 DDL if any entity class has been annotated with `@com.github.gekoh.yagen.api.TemporalEntity`.
 In that case we can use the maven plugin exec:java to create these entities transparently during maven build.  
 See generator class `com.github.gekoh.yagen.hst.CreateEntities` used in maven module `lib/yagen-example-domain/pom.xml`.  
-Also hbm.xml mapping file will be created to be able to use these history entity classes within JPA queries 
+Also orm.xml mapping file will be created to be able to use these history entity classes within JPA queries 
 (e.g. `com.github.gekoh.yagen.example.test.HistoryTest.testHistory`).
 
 ## DDL output
