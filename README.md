@@ -53,6 +53,35 @@ is referenced. See `com.github.gekoh.yagen.example.test.TestBase` which is used 
     }
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+## Configuration
+### Persistence Unit properties
+
+* `yagen.generator.profile.providerClass` name of subclass from `com.github.gekoh.yagen.ddl.ProfileProvider` which will
+  be called for creating a generation profile as config container for DDL creation where e.g. additional DDLs can be 
+  added. This is optional if no further DDL snippets are required or any other tweak is needed. 
+* `yagen.generator.bypass.implement` when set to `true` yaGen will generate trigger bypass functionality into the
+  trigger sources to be able to disable particular (or all) triggers at runtime (see static
+  helper method `com.github.gekoh.yagen.util.DBHelper.setBypass`)
+
+### System properties
+
+* `yagen.bypass` only for HSQLDB: if set (any value) all triggers (audit, history, i18n-view, cascade-null) will be
+  bypassed, this is mainly for junit tests. Note that bypass functionality needs to be enabled, see
+  PU property `yagen.generator.bypass.implement`
+
+### Static configuration
+* `com.github.gekoh.yagen.util.DBHelper.setBypass` specify regular expression matching trigger names (audit, history,
+  i18n-view, cascade-null) which will be bypassed. Note that bypass functionality needs to be enabled, see
+  Persistence Unit property `yagen.generator.bypass.implement`
+
+## Create history entity classes
+yaGen is able to generate entity classes mapped to history tables which in turn are automatically created along with the
+DDL if any entity class has been annotated with `@com.github.gekoh.yagen.api.TemporalEntity`.
+In that case we can use the maven plugin exec:java to create these entities transparently during maven build.  
+See generator class `com.github.gekoh.yagen.hst.CreateEntities` used in maven module `lib/yagen-example-domain/pom.xml`.  
+Also hbm.xml mapping file will be created to be able to use these history entity classes within JPA queries 
+(e.g. `com.github.gekoh.yagen.example.test.HistoryTest.testHistory`).
+
 ## DDL output
 
 ### Plain dump
@@ -67,23 +96,3 @@ from javadoc source on class and field level. In this case we need to call the j
 Doclet functionality which might not be available with specific JVM versions.
 See usage of `com.github.gekoh.yagen.ddl.comment.CommentsDDLGenerator` with profile
 `ddl-gen-with-tabNcol-comments` in `lib/yagen-example-domain/pom.xml`.
-
-## Configuration
-### Persistence Unit properties
-
-* `yagen.generator.profile.providerClass` name of subclass from `com.github.gekoh.yagen.ddl.ProfileProvider` which will
-be called for creating a generation profile as config container for DDL creation where e.g. additional DDLs can be added.
-* `yagen.generator.bypass.implement` when set to `true` yaGen will generate trigger bypass functionality into the 
-trigger sources to be able to disable particular (or all) triggers at runtime (see static
-helper method `com.github.gekoh.yagen.util.DBHelper.setBypass`)
-
-### System properties
-
-* `yagen.bypass` only for HSQLDB: if set (any value) all triggers (audit, history, i18n-view, cascade-null) will be 
-bypassed, this is mainly for junit tests. Note that bypass functionality needs to be enabled, see 
-PU property `yagen.generator.bypass.implement` 
-
-### Static configuration
-* `com.github.gekoh.yagen.util.DBHelper.setBypass` specify regular expression matching trigger names (audit, history,
-  i18n-view, cascade-null) which will be bypassed. Note that bypass functionality needs to be enabled, see
-  Persistence Unit property `yagen.generator.bypass.implement`
