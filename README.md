@@ -33,14 +33,14 @@ So basically yaGen only kicks in when
 * some Hibernate classes have been patched before loading via class loader and 
 * Hibernate is executing hbm2ddl (class `org.hibernate.tool.hbm2ddl.SchemaExport`)
 
-Agent
--
+## Initialization
+
+### Agent
 The easiest way of accomplishing class patching e.g. in a working setup is to use
 the yaGen java agent when starting the JVM (like `-javaagent:${project.build.directory}/agents/yagen-agent.jar`, 
 see `lib/yagen-example-domain/pom.xml`).
 
-Static Init
--
+### Static
 This is only possible if Hibernate classes not have been loaded yet until initializing class
 is referenced. See `com.github.gekoh.yagen.example.test.TestBase` which is used for JUnit tests.
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -53,17 +53,37 @@ is referenced. See `com.github.gekoh.yagen.example.test.TestBase` which is used 
     }
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-DDL Dump
--
+## DDL output
+
+### Plain dump
 If only DDL output is required this can be done via executing java class
 `com.github.gekoh.yagen.ddl.CoreDDLGenerator`
 e.g. with maven plugin (see profile `ddl-gen` within `lib/yagen-example-domain/pom.xml`).
 Note that you need a working JPA configuration using hibernate in classpath.
 
-DDL Dump with comments
--
+### Dump with comments
 YaGen also can generate table and column comments (for Oracle RDBMS) which are extracted
 from javadoc source on class and field level. In this case we need to call the javadoc
 Doclet functionality which might not be available with specific JVM versions.
 See usage of `com.github.gekoh.yagen.ddl.comment.CommentsDDLGenerator` with profile
 `ddl-gen-with-tabNcol-comments` in `lib/yagen-example-domain/pom.xml`.
+
+## Configuration
+### Persistence Unit properties
+
+* `yagen.generator.profile.providerClass` name of subclass from `com.github.gekoh.yagen.ddl.ProfileProvider` which will
+be called for creating a generation profile as config container for DDL creation where e.g. additional DDLs can be added.
+* `yagen.generator.bypass.implement` when set to `true` yaGen will generate trigger bypass functionality into the 
+trigger sources to be able to disable particular (or all) triggers at runtime (see static
+helper method `com.github.gekoh.yagen.util.DBHelper.setBypass`)
+
+### System properties
+
+* `yagen.bypass` only for HSQLDB: if set (any value) all triggers (audit, history, i18n-view, cascade-null) will be 
+bypassed, this is mainly for junit tests. Note that bypass functionality needs to be enabled, see 
+PU property `yagen.generator.bypass.implement` 
+
+### Static configuration
+* `com.github.gekoh.yagen.util.DBHelper.setBypass` specify regular expression matching trigger names (audit, history,
+  i18n-view, cascade-null) which will be bypassed. Note that bypass functionality needs to be enabled, see
+  Persistence Unit property `yagen.generator.bypass.implement`
