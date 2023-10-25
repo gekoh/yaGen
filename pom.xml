@@ -66,7 +66,9 @@
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <slf4j.version>1.6.1</slf4j.version>
-        <hibernate.version>5.4.12.Final</hibernate.version>
+<!--        <hibernate.version>5.4.12.Final</hibernate.version>-->
+        <!-- latest hibernate 5 version supporting java 8 next to 11 and 17, removed dependency to dom4j -->
+        <hibernate.version>5.6.15.Final</hibernate.version>
         <commons-cli.version>1.2</commons-cli.version>
 
         <!-- github server corresponds to entry in ~/.m2/settings.xml -->

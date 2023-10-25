@@ -20,11 +20,8 @@ import com.github.gekoh.yagen.api.NamingStrategy;
 import com.github.gekoh.yagen.api.TemporalEntity;
 import com.github.gekoh.yagen.hibernate.PatchGlue;
 import com.github.gekoh.yagen.util.DBHelper;
-import org.apache.commons.lang.StringUtils;
 import org.apache.velocity.VelocityContext;
 import org.apache.velocity.app.Velocity;
-import org.dom4j.Document;
-import org.dom4j.io.SAXReader;
 import org.hibernate.SessionFactory;
 import org.hibernate.boot.Metadata;
 import org.hibernate.boot.MetadataSources;
@@ -40,28 +37,11 @@ import javax.persistence.EntityManagerFactory;
 import javax.persistence.MappedSuperclass;
 import javax.persistence.Persistence;
 import javax.persistence.metamodel.EntityType;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.Reader;
-import java.io.StringWriter;
-import java.lang.reflect.Field;
+import java.io.*;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.EnumSet;
-import java.util.HashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -164,19 +144,19 @@ public class DDLGenerator {
 
     @SuppressWarnings("UnusedDeclaration")
     public static class Profile implements Cloneable {
-        private static final List<Profile> PROFILES = new ArrayList<Profile>();
+        private static final List<Profile> PROFILES = new ArrayList<>();
 
         private String name;
         private String outputFile;
         private String persistenceUnitName;
-        private Set<Class> entityClasses = new LinkedHashSet<Class>();
-        private List<AddDDLEntry> headerDdls = new ArrayList<AddDDLEntry>();
-        private List<AddDDLEntry> addDdls = new ArrayList<AddDDLEntry>();
+        private Set<Class> entityClasses = new LinkedHashSet<>();
+        private List<AddDDLEntry> headerDdls = new ArrayList<>();
+        private List<AddDDLEntry> addDdls = new ArrayList<>();
         private boolean disableFKs = false;
         private boolean noHistory = false;
         private Pattern onlyRenderEntities;
         private Map<String, Map<String, String>> comments;
-        private List<Duplexer> duplexers = new ArrayList<Duplexer>();
+        private List<Duplexer> duplexers = new ArrayList<>();
         private NamingStrategy namingStrategy;
 
         private boolean historyInitSet = false;
@@ -323,14 +303,14 @@ public class DDLGenerator {
         }
 
         public List<AddDDLEntry> getAllDdls() {
-            List<AddDDLEntry> allDdls = new ArrayList<AddDDLEntry>(getHeaderDdls());
+            List<AddDDLEntry> allDdls = new ArrayList<>(getHeaderDdls());
             allDdls.addAll(getAddDdls());
             return allDdls;
         }
 
 
         public List<String> getHeaderStatements (Dialect dialect) {
-            List<String> ddlList = new ArrayList<String>();
+            List<String> ddlList = new ArrayList<>();
             int idx = 0;
             StringWriter sw = new StringWriter();
 
@@ -356,7 +336,7 @@ public class DDLGenerator {
         }
 
         public List<String> getFooterStatements (Dialect dialect) {
-            List<String> ddlList = new ArrayList<String>();
+            List<String> ddlList = new ArrayList<>();
             StringWriter sw;
 
             for (AddDDLEntry addDdlFile : getAddDdls()) {
@@ -410,32 +390,16 @@ public class DDLGenerator {
             profile.name = getName();
             profile.outputFile = getOutputFile();
             profile.persistenceUnitName = getPersistenceUnitName();
-            profile.entityClasses = new LinkedHashSet<Class>(this.entityClasses);
-            profile.headerDdls = new ArrayList<AddDDLEntry>(this.headerDdls);
-            profile.addDdls = new ArrayList<AddDDLEntry>(this.addDdls);
+            profile.entityClasses = new LinkedHashSet<>(this.entityClasses);
+            profile.headerDdls = new ArrayList<>(this.headerDdls);
+            profile.addDdls = new ArrayList<>(this.addDdls);
             profile.disableFKs = isDisableFKs();
             profile.noHistory = isNoHistory();
             profile.onlyRenderEntities = getOnlyRenderEntities();
-            profile.comments = this.comments != null ? new HashMap<String, Map<String, String>>(this.comments) : null;
-            profile.duplexers = new ArrayList<Duplexer>(this.duplexers);
+            profile.comments = this.comments != null ? new HashMap<>(this.comments) : null;
+            profile.duplexers = new ArrayList<>(this.duplexers);
 
             return profile;
-        }
-    }
-
-    private static Document getPersistenceDocument (String persistenceXml) {
-        if (StringUtils.isEmpty(persistenceXml)) {
-            LOG.warn("empty persistence.xml or orm file specified");
-            return null;
-        }
-        try {
-            InputStream resource = DDLGenerator.class.getResourceAsStream("/" + persistenceXml);
-            if (resource == null) {
-                resource = new FileInputStream(persistenceXml);
-            }
-            return new SAXReader().read(resource);
-        } catch (Exception e) {
-            throw new IllegalArgumentException("unable to find resource "+persistenceXml+" in classpath or filesystem", e);
         }
     }
 
