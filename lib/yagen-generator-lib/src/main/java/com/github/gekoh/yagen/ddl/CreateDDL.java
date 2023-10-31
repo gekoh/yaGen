@@ -90,8 +90,7 @@ import static com.github.gekoh.yagen.util.DBHelper.isPostgres;
 public class CreateDDL {
     private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(CreateDDL.class);
 
-    private static final int MAX_LEN_TABLE_NAME = 26;
-    private static final int MAX_LEN_OBJECT_NAME = 30;
+    private static final String PARAM_MAX_LEN_OBJECT_NAME = "yagen.generator.db.constraints.max-object-name-length";
 
     public static final String STATIC_FIELD_TABLE_NAME_SHORT = "TABLE_NAME_SHORT";
 
@@ -182,13 +181,34 @@ public class CreateDDL {
     private DDLGenerator.Profile currentProfile;
 
     private List<String> dbObjects = new ArrayList<String>();
+    
+    private Integer maxObjectNameLength; // specified by persistence unit property yagen.generator.db.constraints.max-object-name-length
+    private Integer maxTableNameLength; // derived from maxObjectNameLength
 
     public CreateDDL(Object profile, Dialect dialect) {
         if (!(profile instanceof DDLGenerator.Profile)) {
             throw new IllegalArgumentException("profile parameter needs to be an instance of " + DDLGenerator.Profile.class.getName());
         }
-        init((DDLGenerator.Profile)profile);
+        DDLGenerator.Profile profileT = (DDLGenerator.Profile) profile;
+        init(profileT);
         initViewsAndRegisterDDLs(dialect);
+
+        if (profileT.getMetadata() != null) {
+            Map configurationValues = DBHelper.getConfigurationValues(profileT.getMetadata());
+
+            if (configurationValues != null) {
+                Object length = configurationValues.get(PARAM_MAX_LEN_OBJECT_NAME);
+                if (length != null) {
+                    maxObjectNameLength = StringUtils.isNotEmpty((String) length) ? Integer.parseInt((String) length) : null;
+                }
+            }
+        }
+
+        if (maxObjectNameLength == null && isOracle(dialect)) {
+            maxObjectNameLength = 30;
+        }
+
+        maxTableNameLength = maxObjectNameLength != null ? maxObjectNameLength - 4 : null;
     }
 
     public void init(DDLGenerator.Profile profile) {
@@ -277,14 +297,14 @@ public class CreateDDL {
         }
 
         if (isOracle(dialect)) {
-            int maxlen = CreateDDL.MAX_LEN_TABLE_NAME;
+            Integer maxlen = maxTableNameLength;
             TableConfig config = tblNameToConfig.get(nameLC);
 
             if (views.contains(nameLC) || nameLC.endsWith("_mut") || nameLC.endsWith("_hst") || nameLC.endsWith("_pro") || nameLC.endsWith(I18N_LIVE_TABLE_SUFFIX) || (config != null && config.getI18nBaseEntityFkCol() != null)) {
-                maxlen = CreateDDL.MAX_LEN_OBJECT_NAME;
+                maxlen = maxObjectNameLength;
             }
 
-            if (name.length() > maxlen) {
+            if (maxlen != null && name.length() > maxlen) {
                 throw new IllegalArgumentException("table name '" + name + "' too long, counts " + name.length() + " chars. " +
                         "please specify a name with less or equal to " + maxlen + " chars.");
             }
@@ -301,9 +321,9 @@ public class CreateDDL {
         }
 
         if (isOracle(dialect)) {
-            if (name.length() > CreateDDL.MAX_LEN_OBJECT_NAME) {
+            if (maxObjectNameLength != null && name.length() > maxObjectNameLength) {
                 throw new IllegalArgumentException("object name '" + name + "' too long, counts " + name.length() + " chars. " +
-                        "please specify a name with less or equal to " + CreateDDL.MAX_LEN_OBJECT_NAME + " chars.");
+                        "please specify a name with less or equal to " + maxObjectNameLength + " chars.");
             }
         }
 
@@ -1393,7 +1413,7 @@ public class CreateDDL {
     private void writePostgreSqlAuditTrigger(Dialect dialect, StringBuffer buf, String tableNameLC, boolean singleTimestamp, Set<String> columns) {
         String triggerName = getProfile().getNamingStrategy().triggerName(getEntityClassName(tableNameLC), tableNameLC, null, Constants._ATR);
 
-        if (triggerName.length() > CreateDDL.MAX_LEN_OBJECT_NAME) {
+        if (maxObjectNameLength != null && triggerName.length() > maxObjectNameLength) {
             triggerName = getShortName(tableNameLC) + Constants._ATR;
         }
 
@@ -1420,7 +1440,7 @@ public class CreateDDL {
     private void writeOracleAuditTrigger(Dialect dialect, StringBuffer buf, VelocityContext context, String tableNameLC, String templateName) {
         String triggerName = getProfile().getNamingStrategy().triggerName(getEntityClassName(tableNameLC), tableNameLC, null, Constants._ATR);
 
-        if (triggerName.length() > CreateDDL.MAX_LEN_OBJECT_NAME) {
+        if (maxObjectNameLength != null && triggerName.length() > maxObjectNameLength) {
             triggerName = getShortName(tableNameLC) + Constants._ATR;
         }
 
@@ -1941,7 +1961,7 @@ public class CreateDDL {
 
     private void writeI18NDetailViewTriggerCreateString (Dialect dialect, StringBuffer buf, String i18nDetailTblName, String i18nTblName, String i18nFKColName, Set<String> columns) {
         VelocityContext context = newVelocityContext(dialect);
-        String triggerBaseName = i18nDetailTblName.length() > MAX_LEN_OBJECT_NAME-4 ? i18nDetailTblName.substring(0, MAX_LEN_OBJECT_NAME-4) : i18nDetailTblName;
+        String triggerBaseName = maxTableNameLength != null && i18nDetailTblName.length() > maxTableNameLength ? i18nDetailTblName.substring(0, maxTableNameLength) : i18nDetailTblName;
 
         context.put("i18nDetailTblName", i18nDetailTblName);
         context.put("i18nTblName", i18nTblName);

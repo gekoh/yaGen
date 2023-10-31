@@ -141,19 +141,17 @@ public class DDLGenerator {
     }
 
     public static Profile createProfileFromMetadata(String profileName, Metadata metadata) {
+        Profile profile;
         Map configurationValues = DBHelper.getConfigurationValues(metadata);
         String providerClass = configurationValues != null ? (String) configurationValues.get(PERSISTENCE_UNIT_PROPERTY_PROFILE_PROVIDER_CLASS) : null;
         try {
-            if (providerClass != null) {
-                return ((ProfileProvider) Class.forName(providerClass).newInstance())
-                        .getProfile(profileName);
-            }
-            else {
-                return new Profile(profileName);
-            }
+            profile = providerClass != null ? ((ProfileProvider) Class.forName(providerClass).newInstance())
+                    .getProfile(profileName) : new Profile(profileName);
         } catch (Exception e) {
             throw new IllegalStateException(e);
         }
+        profile.setMetadata(metadata);
+        return profile;
     }
 
     @SuppressWarnings("UnusedDeclaration")
@@ -174,6 +172,8 @@ public class DDLGenerator {
         private NamingStrategy namingStrategy;
 
         private boolean historyInitSet = false;
+
+        private Metadata metadata;
 
         public static List<Profile> getAllProfiles() {
             return Collections.unmodifiableList(PROFILES);
@@ -390,6 +390,14 @@ public class DDLGenerator {
 
         public void setNamingStrategy(NamingStrategy namingStrategy) {
             this.namingStrategy = namingStrategy;
+        }
+
+        public Metadata getMetadata() {
+            return metadata;
+        }
+
+        public void setMetadata(Metadata metadata) {
+            this.metadata = metadata;
         }
 
         @Override
