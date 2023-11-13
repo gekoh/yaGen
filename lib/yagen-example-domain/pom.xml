@@ -207,7 +207,6 @@
                 <configuration>
                     <forkMode>always</forkMode>
                     <argLine>-javaagent:${project.build.directory}/agents/yagen-agent.jar</argLine>
-                    <argLine>-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005</argLine>
                 </configuration>
             </plugin>
         </plugins>
