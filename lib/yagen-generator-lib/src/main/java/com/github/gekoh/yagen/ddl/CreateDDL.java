@@ -15,73 +15,37 @@
 */
 package com.github.gekoh.yagen.ddl;
 
-import com.github.gekoh.yagen.api.AuditInfo;
-import com.github.gekoh.yagen.api.Auditable;
-import com.github.gekoh.yagen.api.Changelog;
 import com.github.gekoh.yagen.api.CheckConstraint;
-import com.github.gekoh.yagen.api.Constants;
-import com.github.gekoh.yagen.api.Default;
-import com.github.gekoh.yagen.api.DefaultNamingStrategy;
-import com.github.gekoh.yagen.api.Deferrable;
-import com.github.gekoh.yagen.api.Generated;
 import com.github.gekoh.yagen.api.Index;
-import com.github.gekoh.yagen.api.IntervalPartitioning;
-import com.github.gekoh.yagen.api.LayeredTablesView;
-import com.github.gekoh.yagen.api.NamingStrategy;
-import com.github.gekoh.yagen.api.NoForeignKeyConstraint;
-import com.github.gekoh.yagen.api.Profile;
-import com.github.gekoh.yagen.api.Sequence;
-import com.github.gekoh.yagen.api.TemporalEntity;
-import com.github.gekoh.yagen.api.UniqueConstraint;
+import com.github.gekoh.yagen.api.*;
 import com.github.gekoh.yagen.hibernate.PatchGlue;
 import com.github.gekoh.yagen.hst.CreateEntities;
 import com.github.gekoh.yagen.util.DBHelper;
 import com.github.gekoh.yagen.util.FieldInfo;
+import jakarta.persistence.CollectionTable;
+import jakarta.persistence.DiscriminatorValue;
+import jakarta.persistence.JoinTable;
+import jakarta.persistence.MappedSuperclass;
 import org.apache.commons.lang.StringUtils;
 import org.apache.velocity.VelocityContext;
 import org.apache.velocity.app.Velocity;
 import org.hibernate.dialect.Dialect;
-import org.hibernate.mapping.Column;
-import org.hibernate.mapping.Constraint;
-import org.hibernate.mapping.ForeignKey;
-import org.hibernate.mapping.PrimaryKey;
 import org.hibernate.mapping.Table;
-import org.hibernate.mapping.UniqueKey;
+import org.hibernate.mapping.*;
 
-import javax.persistence.CollectionTable;
-import javax.persistence.DiscriminatorValue;
-import javax.persistence.JoinTable;
-import javax.persistence.MappedSuperclass;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.Reader;
-import java.io.SequenceInputStream;
-import java.io.StringReader;
-import java.io.StringWriter;
-import java.io.UnsupportedEncodingException;
-import java.io.Writer;
+import java.io.*;
 import java.lang.annotation.Annotation;
 import java.sql.Types;
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.TreeSet;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static com.github.gekoh.yagen.hibernate.PatchGlue.STATEMENT_SEPARATOR;
-import static com.github.gekoh.yagen.util.DBHelper.isHsqlDb;
-import static com.github.gekoh.yagen.util.DBHelper.isOracle;
-import static com.github.gekoh.yagen.util.DBHelper.isPostgres;
+import static com.github.gekoh.yagen.util.DBHelper.*;
 
 /**
  * @author Georg Kohlweiss
@@ -124,17 +88,20 @@ public class CreateDDL {
     private static final Pattern SEQ_CREATE_PATTERN = Pattern.compile("create sequence[\\s]+([a-zA-Z]+[0-9a-zA-Z_]*)");
     private static final Pattern PKG_CREATE_PATTERN = Pattern.compile("create( or replace)?[\\s]+package[\\s]+([a-zA-Z]+[0-9a-zA-Z_]*)[\\s]", Pattern.MULTILINE | Pattern.CASE_INSENSITIVE);
 
-    private static final Pattern COL_PATTERN = Pattern.compile("([\\(|\\s]?)(" + REGEX_COLNAME + ")([\\s]((varchar(2)?\\([^\\)]+\\))|(number\\([^\\)]+\\))|(numeric\\([^\\)]+\\))|(timestamp(\\s*\\([0-9]+\\))?)|(date)|([cb]lob)|(text)|(char\\([^\\)]+\\))|(int((eger)|[0-9]*))|(bigint)|(bit)|(bool(ean)?)|(((double)|(float[0-9]?))( precision)?)))([\\s]+default[\\s]*([^\\s]*))?(([\\s]+constraint[\\s]+([a-zA-Z]+[0-9a-zA-Z_]*))?([\\s]+not)?[\\s]+null)?(([\\s]+constraint[\\s]+([a-zA-Z]+[0-9a-zA-Z_]*))?[\\s]+unique)?[^\\(,]*(,|\\))");
     private static final int COL_PATTERN_IDX_COLNAME = 2;
     private static final int COL_PATTERN_IDX_TYPE    = 4;
-    private static final int COL_PATTERN_IDX_DEFAULT = 27;
-    private static final int COL_PATTERN_IDX_NOTNULL = 29;
-    private static final int COL_PATTERN_IDX_NOTNULL_CONS = 30;
-    private static final int COL_PATTERN_IDX_NOTNULL_CONS_NAME = 31;
-    private static final int COL_PATTERN_IDX_NOT     = 32;
-    private static final int COL_PATTERN_IDX_UNIQUE  = 33;
-    private static final int COL_PATTERN_IDX_UNIQUE_CONS = 34;
-    private static final int COL_PATTERN_IDX_UNIQUE_CONS_NAME = 35;
+    private static final int COL_PATTERN_IDX_DEFAULT = 28;
+    private static final int COL_PATTERN_IDX_NOTNULL = 30;
+    private static final int COL_PATTERN_IDX_NOTNULL_CONS_NAME = 32;
+    private static final int COL_PATTERN_IDX_NOT     = 33;
+    private static final int COL_PATTERN_IDX_UNIQUE  = 34;
+    private static final int COL_PATTERN_IDX_UNIQUE_CONS_NAME = 36;
+    private static final String COL_PATTERN_IDX_CHECK  = "check";
+    private static final String COL_PATTERN_IDX_CHECK_NAME  = "checkName";
+    private static final Pattern COL_PATTERN = Pattern.compile("([\\(|\\s]?)(" + REGEX_COLNAME + ")([\\s]((varchar(2)?\\([^\\)]+\\))|(number\\([^\\)]+\\))|(numeric\\([^\\)]+\\))|(timestamp(\\s*\\([0-9]+\\))?)|(date)|([cb]lob)|(text)|(char\\([^\\)]+\\))|(int((eger)|[0-9]*))|(bigint)|(bit)|(bool(ean)?)|(((double)|(float[0-9]?(\\s*\\([0-9]+\\))?))( precision)?)))([\\s]+default[\\s]*([^\\s]*))?(([\\s]+constraint[\\s]+([a-zA-Z]+[0-9a-zA-Z_]*))?([\\s]+not)?[\\s]+null)?" +
+            "(([\\s]+constraint[\\s]+([a-zA-Z]+[0-9a-zA-Z_]*))?[\\s]+unique)?" +
+            "(?<" + COL_PATTERN_IDX_CHECK + ">([\\s]+constraint[\\s]+(?<" + COL_PATTERN_IDX_CHECK_NAME + ">[a-zA-Z]+[0-9a-zA-Z_]*))?[\\s]+check[\\s]+\\(([^\\(]+\\([^\\)]+\\))*\\))?" +
+            "[^\\(,]*(,|\\))");
 
     private static final Pattern UNIQUE_PATTERN = Pattern.compile("(,(([\\s]*constraint[\\s]+([a-zA-Z]+[0-9a-zA-Z_]*))?[\\s]*unique[\\s]*\\((" + REGEX_COLNAME + "([\\s]*,[\\s]*" + REGEX_COLNAME + ")*)\\)))");
     private static final int UNIQUE_PATTERN_IDX_UNIQUE_FULL = 2;
@@ -516,7 +483,7 @@ public class CreateDDL {
                     JoinTable joinTable = tableConfig.getTableAnnotationOfType(JoinTable.class);
                     CollectionTable collectionTable = tableConfig.getTableAnnotationOfType(CollectionTable.class);
 
-                    javax.persistence.UniqueConstraint[] uniqueConstraints = joinTable != null ? joinTable.uniqueConstraints() : collectionTable != null ? collectionTable.uniqueConstraints() : null;
+                    jakarta.persistence.UniqueConstraint[] uniqueConstraints = joinTable != null ? joinTable.uniqueConstraints() : collectionTable != null ? collectionTable.uniqueConstraints() : null;
 
                     if (uniqueConstraints == null || uniqueConstraints.length < 1) {
                         throw new IllegalStateException("cannot create history for table "+liveTableName+" since this table has no unique or primary key");
@@ -586,7 +553,7 @@ public class CreateDDL {
 
             buf.append("create sequence ").append(seqName);
             
-            if (dialect.supportsPooledSequences()) {
+            if (dialect.getSequenceSupport().supportsPooledSequences()) {
                 buf.append(" start with ").append(sequence.startWith())
                         .append(" increment by ").append(sequence.incrementBy());
             }
@@ -1215,7 +1182,7 @@ public class CreateDDL {
                 Default defAnn = tableConfig.getColNameToDefault().get(colName);
 
                 if (defAnn != null) {
-                    String defaultExpr = defAnn.currentTimestamp() ? dialect.getCurrentTimestampSQLFunctionName() : defAnn.sqlExpression();
+                    String defaultExpr = defAnn.currentTimestamp() ? dialect.getCurrentTimestampSelectString() : defAnn.sqlExpression();
 
                     b.append(sqlCreate.substring(idx, matcher.end(COL_PATTERN_IDX_TYPE)));
                     b.append(" default ").append(defaultExpr);
@@ -1263,12 +1230,16 @@ public class CreateDDL {
         int intScale = scale != null ? scale : 0;
 
         VelocityContext context = newVelocityContext(dialect);
-        context.put("timestampType", dialect.getTypeName(Types.TIMESTAMP, intLen, intPrec, intScale));
-        context.put("varcharType", dialect.getTypeName(Types.VARCHAR, intLen, intPrec, intScale));
+        context.put("timestampType", getTimestampDdlTypeDeclaration(dialect));
+        context.put("varcharType", getVarcharDdlTypeDeclaration(dialect, intLen));
 
         StringWriter wr = new StringWriter();
         Velocity.evaluate(context, wr, CreateDDL.class.getName() + "#formatColumn", colTemplate);
         return wr.toString();
+    }
+
+    private static String getVarcharDdlTypeDeclaration(Dialect dialect, int intLen) {
+        return DBHelper.getDdlTypeDeclaration(dialect, Types.VARCHAR, intLen, 0, 0);
     }
 
     private String getTimelineView(Changelog changelog, TableConfig tableConfig, Dialect dialect, String sqlCreate, String viewName, String tableName, Set<String> columns, List<String> pkCols) {
@@ -2065,7 +2036,7 @@ public class CreateDDL {
         if (columns.contains(AuditInfo.LAST_MODIFIED_BY)) {
             context.put("MODIFIER_COLUMN_NAME", AuditInfo.LAST_MODIFIED_BY);
             context.put("MODIFIER_COLUMN_NAME_LENGTH", Constants.USER_NAME_LEN);
-            context.put("MODIFIER_COLUMN_TYPE", dialect.getTypeName(Types.VARCHAR, Constants.USER_NAME_LEN, 0, 0));
+            context.put("MODIFIER_COLUMN_TYPE", getVarcharDdlTypeDeclaration(dialect, Constants.USER_NAME_LEN));
         }
         context.put("objectName", objectName);
         context.put("liveTableName", tableName);
@@ -2078,7 +2049,7 @@ public class CreateDDL {
         context.put("histRelevantCols", histRelevantCols);
         context.put("blobCols", blobCols);
         context.put("columnMap", columnMap);
-        context.put("varcharType", dialect.getTypeName(Types.VARCHAR, 64, 0, 0));
+        context.put("varcharType", getVarcharDdlTypeDeclaration(dialect, 64));
 
         StringWriter wr = new StringWriter();
         mergeTemplateFromResource("HstTrigger.vm.pl.sql", wr, context);
@@ -2102,7 +2073,7 @@ public class CreateDDL {
         if (columns.contains(AuditInfo.LAST_MODIFIED_BY)) {
             context.put("MODIFIER_COLUMN_NAME", AuditInfo.LAST_MODIFIED_BY);
             context.put("MODIFIER_COLUMN_NAME_LENGTH", Constants.USER_NAME_LEN);
-            context.put("MODIFIER_COLUMN_TYPE", dialect.getTypeName(Types.VARCHAR, Constants.USER_NAME_LEN, 0, 0));
+            context.put("MODIFIER_COLUMN_TYPE", getVarcharDdlTypeDeclaration(dialect, Constants.USER_NAME_LEN));
         }
         context.put("liveTableName", tableName);
         context.put("hstTableName", histTableName);
@@ -2112,7 +2083,7 @@ public class CreateDDL {
         context.put("nonPkColumns", nonPkColumns);
         context.put("histRelevantCols", histRelevantCols);
         context.put("columnMap", columnMap);
-        context.put("timestampType", dialect.getTypeName(Types.TIMESTAMP, 0, 0, 0));
+        context.put("timestampType", getTimestampDdlTypeDeclaration(dialect));
 
         StringWriter wr = new StringWriter();
 
@@ -2125,6 +2096,10 @@ public class CreateDDL {
         }
 
         return wr.toString();
+    }
+
+    private static String getTimestampDdlTypeDeclaration(Dialect dialect) {
+        return DBHelper.getDdlTypeDeclaration(dialect, Types.TIMESTAMP, 0, 9, 0);
     }
 
     private String getLatestSnapshotViewSql (Dialect dialect,
@@ -2146,7 +2121,7 @@ public class CreateDDL {
         if (columns.contains(AuditInfo.LAST_MODIFIED_BY)) {
             context.put("MODIFIER_COLUMN_NAME", AuditInfo.LAST_MODIFIED_BY);
             context.put("MODIFIER_COLUMN_NAME_LENGTH", Constants.USER_NAME_LEN);
-            context.put("MODIFIER_COLUMN_TYPE", dialect.getTypeName(Types.VARCHAR, Constants.USER_NAME_LEN, 0, 0));
+            context.put("MODIFIER_COLUMN_TYPE", getVarcharDdlTypeDeclaration(dialect, Constants.USER_NAME_LEN));
         }
         context.put("objectName", viewName);
         context.put("hstTableName", histTableName);
@@ -2156,7 +2131,7 @@ public class CreateDDL {
         context.put("nonPkColumns", nonPkColumns);
         context.put("histRelevantCols", histRelevantCols);
         context.put("columnMap", columnMap);
-        context.put("timestampType", dialect.getTypeName(Types.TIMESTAMP, 0, 0, 0));
+        context.put("timestampType", getTimestampDdlTypeDeclaration(dialect));
 
         StringWriter objWr = new StringWriter();
 
@@ -2227,12 +2202,14 @@ public class CreateDDL {
                 throw new IllegalStateException("cannot find create table in sql: " + sqlCreateString);
             }
 
+            int endColsIdx = matchUnique.find() ? matchUnique.start() : matcher.start(TBL_PATTERN_WO_PK_IDX_AFTER_COL_DEF);
+
             sql.append(sqlCreateString.substring(0, matcher.start(TBL_PATTERN_WO_PK_IDX_TBLNAME))).append(histTableName);
             sql.append(sqlCreateString.substring(matcher.end(TBL_PATTERN_WO_PK_IDX_TBLNAME), matcher.end(TBL_PATTERN_WO_PK_IDX_BEFORE_COL_DEF)));
             sql.append(formatColumn(dialect, HIST_TABLE_PK_COLUMN_NAME+" ${varcharType} not null", Constants.UUID_LEN, null, null)).append(", ");
             sql.append(formatColumn(dialect, HIST_OPERATION_COLUMN_NAME+" ${varcharType} not null", 1, null, null)).append(", ");
 
-            sql.append(sqlCreateString.substring(matcher.end(TBL_PATTERN_WO_PK_IDX_BEFORE_COL_DEF), matcher.start(TBL_PATTERN_WO_PK_IDX_AFTER_COL_DEF)));
+            sql.append(sqlCreateString.substring(matcher.end(TBL_PATTERN_WO_PK_IDX_BEFORE_COL_DEF), endColsIdx));
 
             sql.append(", ");
 
@@ -2319,6 +2296,12 @@ public class CreateDDL {
                     !colName.equals(histColName) &&
                     uniqueColMatcher.group(COL_PATTERN_IDX_NOT) != null) {
                 sql.delete(uniqueColMatcher.start(COL_PATTERN_IDX_NOTNULL), uniqueColMatcher.end(COL_PATTERN_IDX_NOTNULL));
+                colIdx = uniqueColMatcher.start();
+                uniqueColMatcher = COL_PATTERN.matcher(sql.toString());
+            }
+//                remove check constraints
+            else if (uniqueColMatcher.group(COL_PATTERN_IDX_CHECK) != null) {
+                sql.delete(uniqueColMatcher.start(COL_PATTERN_IDX_CHECK), uniqueColMatcher.end(COL_PATTERN_IDX_CHECK));
                 colIdx = uniqueColMatcher.start();
                 uniqueColMatcher = COL_PATTERN.matcher(sql.toString());
             }

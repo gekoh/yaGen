@@ -25,8 +25,9 @@
         <exclude-unlisted-classes>true</exclude-unlisted-classes>
 
         <properties>
-            <property name="hibernate.dialect" value="org.hibernate.dialect.Oracle10gDialect"/>
+            <property name="hibernate.dialect" value="org.hibernate.dialect.OracleDialect"/>
             <property name="hibernate.connection.driver_class" value="java.sql.Driver"/>
+            <property name="hibernate.temp.use_jdbc_metadata_defaults" value="false"/>
             <property name="yagen.generator.bypass.implement" value="true"/>
             <property name="yagen.generator.profile.providerClass" value="com.github.gekoh.yagen.example.ddl.ExampleProfileProvider"/>
         </properties>

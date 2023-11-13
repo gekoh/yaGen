@@ -24,7 +24,7 @@ package ${entityClassPackageName};
 
 import java.time.LocalDateTime;
 
-import javax.persistence.Table;
+import jakarta.persistence.Table;
 
 import com.github.gekoh.yagen.hst.Operation;
 import com.github.gekoh.yagen.api.Generated;
@@ -54,7 +54,7 @@ public class ${entityClassSimpleName} extends
     /**
      * Technical unique key of the live entity.
      */
-    @javax.persistence.Column(name = "${baseEntityUuidColumnName}", length = ${baseEntityUuidColumnLength}, nullable=false)
+    @jakarta.persistence.Column(name = "${baseEntityUuidColumnName}", length = ${baseEntityUuidColumnLength}, nullable=false)
     private String liveUuid;
 #end
 
@@ -67,13 +67,13 @@ public class ${entityClassSimpleName} extends
 ## skip Id column as we map it as liveUuid
 #if( !${fieldInfo.isCollection()} && (!${fieldInfo.getColumnName()} || !$baseEntityUuidColumnName || $baseEntityUuidColumnName != ${fieldInfo.getColumnName()}) )
 #if( ${fieldInfo.isEnum()} )
-    @javax.persistence.Enumerated(value = javax.persistence.EnumType.STRING)
+    @jakarta.persistence.Enumerated(value = jakarta.persistence.EnumType.STRING)
 #end
 #if( ${fieldInfo.isEmbedded()} )
-    @javax.persistence.Embedded
+    @jakarta.persistence.Embedded
 #end
 #if( ${fieldInfo.isLob()} )
-    @javax.persistence.Lob
+    @jakarta.persistence.Lob
 #end
 #if( ${fieldInfo.getColumnAnnotation()} )
     ${fieldInfo.getColumnAnnotation()}

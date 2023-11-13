@@ -9,7 +9,7 @@ select h.*,
 from ${hstTableName} h
     left join ${hstTableName} hd on
 #foreach( $pkColumn in $pkColumns )
-#if( $!{columnMap.get($pkColumn).nullable} )
+#if( $!{columnMap.get($pkColumn).isNullable()} )
               ((hd.${pkColumn} is null and h.${pkColumn} is null) or hd.${pkColumn}=h.${pkColumn}) and
 #else
               hd.${pkColumn}=h.${pkColumn} and

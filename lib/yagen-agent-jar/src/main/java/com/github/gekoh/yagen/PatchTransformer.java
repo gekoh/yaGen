@@ -15,14 +15,7 @@
 */
 package com.github.gekoh.yagen;
 
-import javassist.CannotCompileException;
-import javassist.ClassPool;
-import javassist.CtClass;
-import javassist.CtField;
-import javassist.CtMethod;
-import javassist.LoaderClassPath;
-import javassist.Modifier;
-import javassist.NotFoundException;
+import javassist.*;
 
 import java.io.ByteArrayInputStream;
 import java.lang.instrument.ClassFileTransformer;
@@ -49,6 +42,7 @@ public class PatchTransformer implements ClassFileTransformer {
             "org.hibernate.tool.schema.internal.StandardForeignKeyExporter",
             "org.hibernate.tool.schema.internal.StandardSequenceExporter",
             "org.hibernate.tool.schema.internal.SchemaCreatorImpl",
+            "org.hibernate.tool.schema.internal.Helper",
             "org.hibernate.dialect.Dialect",
             "org.hibernate.boot.model.source.internal.annotations.AnnotationMetadataSourceProcessorImpl"
     );
@@ -126,6 +120,10 @@ public class PatchTransformer implements ClassFileTransformer {
             patchExporterClass(clazz, "afterSequenceSqlString");
             return true;
         }
+        if("org.hibernate.tool.schema.internal.Helper".equals(className)) {
+            patchSchemaCreatorHelper(clazz);
+            return true;
+        }
         if("org.hibernate.tool.schema.internal.SchemaCreatorImpl".equals(className)) {
             patchSchemaCreatorImpl(clazz);
             return true;
@@ -146,7 +144,8 @@ public class PatchTransformer implements ClassFileTransformer {
         CtClass metadataClass = clazz.getClassPool().get("org.hibernate.boot.spi.MetadataImplementor");
         clazz.addField(new CtField(metadataClass, "metadata", clazz));
 
-        clazz.getConstructors()[0].insertBefore("this.metadata = $1;");
+        CtConstructor[] constructors = clazz.getConstructors();
+        constructors[constructors.length-1].insertBefore("this.metadata = $1;");
 
         CtMethod getMetadata = new CtMethod(metadataClass, "getMetadata", null, clazz);
         getMetadata.setBody("return this.metadata;");
@@ -175,15 +174,12 @@ public class PatchTransformer implements ClassFileTransformer {
         );
     }
 
-    private static void patchSchemaCreatorImpl(CtClass clazz) throws CannotCompileException, NotFoundException {
-        ClassPool cp = clazz.getClassPool();
-
+    private static void patchSchemaCreatorHelper(CtClass clazz) throws CannotCompileException, NotFoundException {
         CtMethod method = clazz.getDeclaredMethod("applySqlStrings");
         method.setName("applySqlStringsApi");
-        method.setModifiers(Modifier.setPublic(method.getModifiers()));
 
         CtMethod newMethod = CtMethod.make(
-                "private static void applySqlStrings(java.lang.String[] sqlStrings,\n" +
+                "public static void applySqlStrings(java.lang.String[] sqlStrings,\n" +
                         "\t\t\torg.hibernate.engine.jdbc.internal.Formatter formatter,\n" +
                         "\t\t\torg.hibernate.tool.schema.spi.ExecutionOptions options,\n" +
                         "\t\t\torg.hibernate.tool.schema.internal.exec.GenerationTarget[] targets) {\n" +
@@ -193,10 +189,12 @@ public class PatchTransformer implements ClassFileTransformer {
                 clazz
         );
         clazz.addMethod(newMethod);
+    }
 
-        method = clazz.getDeclaredMethod("performCreation");
-        method.insertBefore("com.github.gekoh.yagen.hibernate.PatchGlue.addHeader($2, $3, $5);");
-        method.insertAfter("com.github.gekoh.yagen.hibernate.PatchGlue.addFooter($2, $3, $5);");
+    private static void patchSchemaCreatorImpl(CtClass clazz) throws CannotCompileException, NotFoundException {
+        CtMethod method = clazz.getDeclaredMethod("performCreation");
+        method.insertBefore("com.github.gekoh.yagen.hibernate.PatchGlue.addHeader($2, $3, $6);");
+        method.insertAfter("com.github.gekoh.yagen.hibernate.PatchGlue.addFooter($2, $3, $6);");
     }
 
     private static void patchDialect(CtClass clazz) throws CannotCompileException, NotFoundException {

@@ -15,21 +15,10 @@
 */
 package com.github.gekoh.yagen.example;
 
-import com.github.gekoh.yagen.api.Auditable;
-import com.github.gekoh.yagen.api.CascadeDelete;
-import com.github.gekoh.yagen.api.Constants;
-import com.github.gekoh.yagen.api.Default;
-import com.github.gekoh.yagen.api.TemporalEntity;
+import com.github.gekoh.yagen.api.*;
+import jakarta.persistence.Table;
+import jakarta.persistence.*;
 
-import javax.persistence.CascadeType;
-import javax.persistence.Column;
-import javax.persistence.Entity;
-import javax.persistence.EnumType;
-import javax.persistence.Enumerated;
-import javax.persistence.JoinColumn;
-import javax.persistence.Lob;
-import javax.persistence.OneToMany;
-import javax.persistence.Table;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -69,7 +58,7 @@ public class Aircraft extends BaseEntity {
     /**
      * horizontal dimension of aircraft from left wing tip to right wing tip
      */
-    @Column(name = "WING_SPAN", precision = 5, scale = 2, nullable = false)
+    @Column(name = "WING_SPAN", precision = 5, nullable = false)
     private float wingSpan;
 
     /**

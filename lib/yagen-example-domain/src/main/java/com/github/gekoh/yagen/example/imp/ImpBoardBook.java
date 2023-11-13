@@ -1,12 +1,7 @@
 package com.github.gekoh.yagen.example.imp;
 
 import com.github.gekoh.yagen.api.LayeredTablesView;
-
-import javax.persistence.Basic;
-import javax.persistence.Column;
-import javax.persistence.Entity;
-import javax.persistence.Id;
-import javax.persistence.Table;
+import jakarta.persistence.*;
 
 /**
  * @author Georg Kohlweiss

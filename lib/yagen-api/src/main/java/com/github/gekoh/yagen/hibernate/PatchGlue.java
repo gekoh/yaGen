@@ -15,13 +15,11 @@
 */
 package com.github.gekoh.yagen.hibernate;
 
-import com.github.gekoh.yagen.api.DefaultNamingStrategy;
 import com.github.gekoh.yagen.util.DBHelper;
 import org.apache.commons.lang.StringUtils;
 import org.hibernate.SessionFactory;
 import org.hibernate.annotations.common.reflection.XClass;
 import org.hibernate.boot.Metadata;
-import org.hibernate.boot.model.naming.PhysicalNamingStrategy;
 import org.hibernate.boot.model.relational.Sequence;
 import org.hibernate.cfg.Configuration;
 import org.hibernate.dialect.Dialect;
@@ -33,7 +31,6 @@ import org.hibernate.mapping.Constraint;
 import org.hibernate.mapping.Index;
 import org.hibernate.mapping.Table;
 import org.hibernate.tool.schema.internal.Helper;
-import org.hibernate.tool.schema.internal.SchemaCreatorImpl;
 import org.hibernate.tool.schema.internal.exec.GenerationTarget;
 import org.hibernate.tool.schema.internal.exec.GenerationTargetToDatabase;
 import org.hibernate.tool.schema.internal.exec.GenerationTargetToScript;
@@ -44,13 +41,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Comparator;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -140,9 +131,7 @@ public class PatchGlue {
         StringBuffer buf = new StringBuffer(returnValue[0]);
 
         Map<String, Column> allColumns = new LinkedHashMap<String, Column>();
-        Iterator<Column> colIt = table.getColumnIterator();
-        while (colIt.hasNext()) {
-            Column column = colIt.next();
+        for (Column column : table.getColumns()) {
             allColumns.put(column.getName().toLowerCase(), column);
         }
 
@@ -195,9 +184,7 @@ public class PatchGlue {
         StringBuffer buf = new StringBuffer(returnValue[0]);
 
         List<Column> columnList = new ArrayList<Column>();
-        Iterator<Column> columns = index.getColumnIterator();
-        while ( columns.hasNext() ) {
-            Column column = columns.next();
+        for (Column column : index.getColumns()) {
             columnList.add(column);
         }
 
@@ -275,7 +262,7 @@ public class PatchGlue {
     private static void writePreparedStatements(String sqlCommand, Formatter formatter, ExecutionOptions options, GenerationTarget[] targets) {
         if (schemaExportPerform == null) {
             try {
-                schemaExportPerform = SchemaCreatorImpl.class.getDeclaredMethod("applySqlStringsApi", String[].class, Formatter.class, ExecutionOptions.class, GenerationTarget[].class);
+                schemaExportPerform = Helper.class.getDeclaredMethod("applySqlStringsApi", String[].class, Formatter.class, ExecutionOptions.class, GenerationTarget[].class);
                 generatorScriptDelimiter = GenerationTargetToScript.class.getDeclaredField("delimiter");
                 generatorScriptDelimiter.setAccessible(true);
                 generatorStdoutDelimiter = GenerationTargetToStdout.class.getDeclaredField("delimiter");

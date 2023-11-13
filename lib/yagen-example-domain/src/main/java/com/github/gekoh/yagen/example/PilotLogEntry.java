@@ -16,14 +16,8 @@
 package com.github.gekoh.yagen.example;
 
 import com.github.gekoh.yagen.api.TemporalEntity;
+import jakarta.persistence.*;
 
-import javax.persistence.Basic;
-import javax.persistence.Column;
-import javax.persistence.Entity;
-import javax.persistence.JoinColumn;
-import javax.persistence.Lob;
-import javax.persistence.OneToOne;
-import javax.persistence.Table;
 import java.time.LocalDateTime;
 
 /**

@@ -12,12 +12,12 @@ import com.github.gekoh.yagen.example.ddl.ExampleProfileProvider;
 import com.github.gekoh.yagen.hibernate.DDLEnhancer;
 import com.github.gekoh.yagen.hibernate.YagenInit;
 import com.github.gekoh.yagen.util.DBHelper;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.EntityManagerFactory;
+import jakarta.persistence.Persistence;
 import org.junit.After;
 import org.junit.Before;
 
-import javax.persistence.EntityManager;
-import javax.persistence.EntityManagerFactory;
-import javax.persistence.Persistence;
 import java.util.Map;
 
 /**

@@ -18,49 +18,12 @@ package com.github.gekoh.yagen.ddl.comment;
 import com.github.gekoh.yagen.ddl.CoreDDLGenerator;
 import com.github.gekoh.yagen.ddl.DDLGenerator;
 import com.github.gekoh.yagen.hibernate.YagenInit;
-import com.sun.javadoc.AnnotationDesc;
-import com.sun.javadoc.AnnotationValue;
-import com.sun.javadoc.ClassDoc;
-import com.sun.javadoc.DocErrorReporter;
-import com.sun.javadoc.Doclet;
-import com.sun.javadoc.FieldDoc;
-import com.sun.javadoc.LanguageVersion;
-import com.sun.javadoc.MethodDoc;
-import com.sun.javadoc.ProgramElementDoc;
-import com.sun.javadoc.RootDoc;
-import com.sun.javadoc.Type;
+import com.sun.javadoc.*;
+import jakarta.persistence.*;
 import org.apache.commons.cli.ParseException;
 import org.apache.commons.lang.StringUtils;
 
-import javax.persistence.AttributeOverride;
-import javax.persistence.AttributeOverrides;
-import javax.persistence.Basic;
-import javax.persistence.Column;
-import javax.persistence.DiscriminatorValue;
-import javax.persistence.Embeddable;
-import javax.persistence.Embedded;
-import javax.persistence.Entity;
-import javax.persistence.Id;
-import javax.persistence.Inheritance;
-import javax.persistence.JoinColumn;
-import javax.persistence.JoinTable;
-import javax.persistence.ManyToMany;
-import javax.persistence.ManyToOne;
-import javax.persistence.MappedSuperclass;
-import javax.persistence.OneToMany;
-import javax.persistence.OneToOne;
-import javax.persistence.Table;
-import javax.persistence.Transient;
-import javax.persistence.Version;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 public class CommentsDDLGenerator extends Doclet {
     private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(CommentsDDLGenerator.class);
@@ -219,14 +182,14 @@ public class CommentsDDLGenerator extends Doclet {
             ClassDoc superClass = klass.superclass();
             String value = getInheritanceStrategyValue(superClass);
             if (DocletUtils.hasAnnotation(superClass, mappedSuperclassAnnotations) ||
-                    (DocletUtils.hasAnnotation(superClass, jpaAnnotations) && "javax.persistence.InheritanceType.TABLE_PER_CLASS".equals(value))) {
+                    (DocletUtils.hasAnnotation(superClass, jpaAnnotations) && "jakarta.persistence.InheritanceType.TABLE_PER_CLASS".equals(value))) {
                 //only hande mappedSuperclass when 'direct' superclass
                 handleClass(root, superClass, tableName, shortTableName);
             }
 
             if (DocletUtils.hasAnnotation(superClass, tableAnnotations) &&
                     DocletUtils.hasAnnotation(superClass, inheritanceAnnotation)) {
-                if ("javax.persistence.InheritanceType.SINGLE_TABLE".equals(value) &&
+                if ("jakarta.persistence.InheritanceType.SINGLE_TABLE".equals(value) &&
                         DocletUtils.hasAnnotation(klass, tableAnnotations)) {
                     handleClass(root, superClass, tableName, shortTableName);
                 }

@@ -16,26 +16,22 @@
 package com.github.gekoh.yagen.util;
 
 import com.github.gekoh.yagen.hibernate.DDLEnhancer;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.NoResultException;
 import org.hibernate.Session;
 import org.hibernate.boot.Metadata;
 import org.hibernate.boot.registry.internal.StandardServiceRegistryImpl;
 import org.hibernate.dialect.Dialect;
+import org.hibernate.engine.jdbc.Size;
 import org.hibernate.internal.SessionFactoryImpl;
 import org.hibernate.jdbc.ReturningWork;
 import org.hibernate.jdbc.Work;
 import org.hibernate.service.ServiceRegistry;
+import org.hibernate.type.descriptor.sql.spi.DdlTypeRegistry;
 
-import javax.persistence.EntityManager;
-import javax.persistence.NoResultException;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
-import java.sql.CallableStatement;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Timestamp;
-import java.sql.Types;
+import java.sql.*;
 import java.util.Map;
 import java.util.UUID;
 import java.util.regex.Pattern;
@@ -421,6 +417,18 @@ public class DBHelper {
         }
         LOG.warn("cannot get configuration values");
         return null;
+    }
+
+    public static String getDdlTypeDeclaration(Dialect dialect, int type, int length, int intPrec, int intScale) {
+        Metadata metadata = getMetadata(dialect);
+        if (metadata != null) {
+            DdlTypeRegistry ddlTypeRegistry = metadata.getDatabase().getTypeConfiguration().getDdlTypeRegistry();
+
+            return ddlTypeRegistry.getTypeName(type, new Size(intPrec, intScale, length, null));
+        } else {
+            LOG.warn("unable to determine db data type");
+            return "varchar(255)";
+        }
     }
 
     public static Timestamp getCurrentTimestamp() {
