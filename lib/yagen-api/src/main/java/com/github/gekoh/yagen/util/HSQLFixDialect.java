@@ -15,12 +15,6 @@
 */
 package com.github.gekoh.yagen.util;
 
-import org.hibernate.HibernateException;
-import org.hibernate.dialect.function.StandardSQLFunction;
-import org.hibernate.type.StandardBasicTypes;
-
-import java.sql.Types;
-
 /**
  * @author Georg Kohlweiss
  */
@@ -29,10 +23,12 @@ public class HSQLFixDialect extends org.hibernate.dialect.HSQLDialect {
 
 
     public HSQLFixDialect() {
+/*
         registerColumnType( Types.BLOB, "blob" );
         registerColumnType( Types.CLOB, "clob" );
 
         this.registerFunction("to_char", new StandardSQLFunction("to_char", StandardBasicTypes.STRING));
+*/
     }
 
     public boolean supportsUniqueConstraintInCreateAlterTable() {
@@ -54,6 +50,7 @@ public class HSQLFixDialect extends org.hibernate.dialect.HSQLDialect {
 
     public static class Timestamp9 extends HSQLFixDialect {
 
+/*
         @Override
         public String getTypeName(int code, long length, int precision, int scale) throws HibernateException {
             if (code == Types.TIMESTAMP && length == 0) {
@@ -61,5 +58,6 @@ public class HSQLFixDialect extends org.hibernate.dialect.HSQLDialect {
             }
             return super.getTypeName(code, length, precision, scale);
         }
+*/
     }
 }

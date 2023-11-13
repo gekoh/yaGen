@@ -67,8 +67,8 @@ public class DefaultNamingStrategy implements NamingStrategy {
     public String classToTableName(String className) {
         try {
             Class<?> aClass = Class.forName(className);
-            if (aClass.isAnnotationPresent(javax.persistence.Table.class)) {
-                String tableName = aClass.getAnnotation(javax.persistence.Table.class).name();
+            if (aClass.isAnnotationPresent(jakarta.persistence.Table.class)) {
+                String tableName = aClass.getAnnotation(jakarta.persistence.Table.class).name();
                 if (StringUtils.isNotEmpty(tableName)) {
                     return tableName(tableName);
                 }

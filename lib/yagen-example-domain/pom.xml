@@ -41,8 +41,8 @@
         </dependency>
 
         <dependency>
-            <groupId>org.hibernate.javax.persistence</groupId>
-            <artifactId>hibernate-jpa-2.1-api</artifactId>
+            <groupId>jakarta.persistence</groupId>
+            <artifactId>jakarta.persistence-api</artifactId>
         </dependency>
 
         <dependency>
@@ -64,12 +64,6 @@
         </dependency>
 
         <dependency>
-            <groupId>org.hibernate</groupId>
-            <artifactId>hibernate-entitymanager</artifactId>
-            <optional>true</optional>
-        </dependency>
-
-        <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-log4j12</artifactId>
             <optional>true</optional>
@@ -82,7 +76,7 @@
         </dependency>
 
         <dependency>
-            <groupId>org.hibernate</groupId>
+            <groupId>org.hibernate.orm</groupId>
             <artifactId>hibernate-core</artifactId>
             <optional>true</optional>
         </dependency>
@@ -213,6 +207,7 @@
                 <configuration>
                     <forkMode>always</forkMode>
                     <argLine>-javaagent:${project.build.directory}/agents/yagen-agent.jar</argLine>
+                    <argLine>-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005</argLine>
                 </configuration>
             </plugin>
         </plugins>

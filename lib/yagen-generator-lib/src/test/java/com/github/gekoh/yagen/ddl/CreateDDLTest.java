@@ -1,7 +1,7 @@
 package com.github.gekoh.yagen.ddl;
 
 import com.github.gekoh.yagen.api.AuditInfo;
-import org.hibernate.dialect.Oracle10gDialect;
+import org.hibernate.dialect.OracleDialect;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -16,7 +16,7 @@ public class CreateDDLTest {
     @Test
     public void testModifyDdl() {
         DDLGenerator.Profile profile = new DDLGenerator.Profile("default");
-        Oracle10gDialect dialect = new Oracle10gDialect();
+        OracleDialect dialect = new OracleDialect();
         CreateDDL createDDL = new CreateDDL(profile, dialect);
 
         TableConfig.add(createDDL, "AMP_JOB_CONFIGS")

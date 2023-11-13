@@ -24,45 +24,17 @@ import com.github.gekoh.yagen.ddl.DDLGenerator;
 import com.github.gekoh.yagen.ddl.EntityClassesSaxHandler;
 import com.github.gekoh.yagen.util.FieldInfo;
 import com.github.gekoh.yagen.util.MappingUtils;
+import jakarta.persistence.*;
 import org.apache.commons.lang.StringUtils;
 import org.apache.velocity.VelocityContext;
 import org.apache.velocity.app.Velocity;
 
-import javax.persistence.Column;
-import javax.persistence.DiscriminatorColumn;
-import javax.persistence.DiscriminatorValue;
-import javax.persistence.Entity;
-import javax.persistence.Inheritance;
-import javax.persistence.JoinColumn;
-import javax.persistence.JoinTable;
-import javax.persistence.ManyToMany;
-import javax.persistence.ManyToOne;
-import javax.persistence.MappedSuperclass;
-import javax.persistence.OneToMany;
-import javax.persistence.PrimaryKeyJoinColumn;
-import javax.persistence.Table;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.Reader;
-import java.io.StringReader;
-import java.io.StringWriter;
+import java.io.*;
 import java.lang.reflect.AccessibleObject;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 /**
  * @author Georg Kohlweiss
@@ -335,10 +307,10 @@ public class CreateEntities {
         context.put("fieldInfoList", fields);
 
         if (baseEntity != null && baseEntity.isAnnotationPresent(MappedSuperclass.class)) {
-            context.put("classAnnotation", classAnnotations + "@javax.persistence.MappedSuperclass");
+            context.put("classAnnotation", classAnnotations + "@jakarta.persistence.MappedSuperclass");
         }
         else if (baseEntity != null && baseEntity.isAnnotationPresent(Entity.class)) {
-            String value = classAnnotations + "@javax.persistence.Entity";
+            String value = classAnnotations + "@jakarta.persistence.Entity";
             String entityName = ((Entity) baseEntity.getAnnotation(Entity.class)).name();
             if (StringUtils.isNotEmpty(entityName)) {
                 value += "(name = \"" + entityName + HISTORY_ENTITY_SUFFIX + "\")";
@@ -350,16 +322,16 @@ public class CreateEntities {
         if (baseEntity != null && baseEntity.isAnnotationPresent(Inheritance.class)) {
             DiscriminatorColumn discriminatorColumn = (DiscriminatorColumn) baseEntity.getAnnotation(DiscriminatorColumn.class);
             String classAnnotation = context.get("classAnnotation") + "\n" +
-                    "@javax.persistence.Inheritance(strategy=javax.persistence.InheritanceType." + ((Inheritance) baseEntity.getAnnotation(Inheritance.class)).strategy().name() + ")";
+                    "@jakarta.persistence.Inheritance(strategy=jakarta.persistence.InheritanceType." + ((Inheritance) baseEntity.getAnnotation(Inheritance.class)).strategy().name() + ")";
             if (discriminatorColumn != null) {
-                classAnnotation += "\n@javax.persistence.DiscriminatorColumn(name=\"" + discriminatorColumn.name() + "\", length=" + discriminatorColumn.length() + ")";
+                classAnnotation += "\n@jakarta.persistence.DiscriminatorColumn(name=\"" + discriminatorColumn.name() + "\", length=" + discriminatorColumn.length() + ")";
             }
             context.put("classAnnotation", classAnnotation);
         }
 //        Inheritance used, baseEntity is subclass
         else if (baseEntity != null && baseEntity.isAnnotationPresent(DiscriminatorValue.class)) {
             context.put("classAnnotation", context.get("classAnnotation") + "\n" +
-                    "@javax.persistence.DiscriminatorValue(\""+((DiscriminatorValue) baseEntity.getAnnotation(DiscriminatorValue.class)).value()+"\")");
+                    "@jakarta.persistence.DiscriminatorValue(\""+((DiscriminatorValue) baseEntity.getAnnotation(DiscriminatorValue.class)).value()+"\")");
         }
 
         if (baseEntitySuperClass != null) {

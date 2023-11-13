@@ -21,11 +21,12 @@ import com.github.gekoh.yagen.example.BoardBookEntry;
 import com.github.gekoh.yagen.example.EngineType;
 import com.github.gekoh.yagen.hst.Operation;
 import com.github.gekoh.yagen.util.DBHelper;
+import jakarta.persistence.Query;
 import org.apache.commons.lang3.StringUtils;
+import org.hsqldb.HsqlException;
 import org.junit.Assert;
 import org.junit.Test;
 
-import javax.persistence.Query;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
@@ -146,8 +147,19 @@ public abstract class HistoryTest extends TestBase {
             em.getTransaction().commit();
             Assert.fail();
         } catch (Exception e) {
-            Assert.assertTrue(e.getCause().getCause() instanceof SQLException);
-            Assert.assertEquals("20100", ((SQLException) e.getCause().getCause()).getSQLState());
+            Throwable lastCause = e.getCause();
+            while (lastCause.getCause() != null) {
+                lastCause = lastCause.getCause();
+            }
+            String sqlState;
+            if (lastCause instanceof SQLException){
+                sqlState = ((SQLException) lastCause).getSQLState();
+            }
+            else {
+                Assert.assertTrue(lastCause instanceof HsqlException);
+                sqlState = ((HsqlException) lastCause).getSQLState();
+            }
+            Assert.assertEquals("20100", sqlState);
         }
     }
 

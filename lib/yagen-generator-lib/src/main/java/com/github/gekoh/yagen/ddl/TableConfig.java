@@ -15,63 +15,22 @@
 */
 package com.github.gekoh.yagen.ddl;
 
-import com.github.gekoh.yagen.api.Auditable;
-import com.github.gekoh.yagen.api.CascadeDelete;
-import com.github.gekoh.yagen.api.CascadeNullable;
-import com.github.gekoh.yagen.api.Changelog;
-import com.github.gekoh.yagen.api.CheckConstraint;
-import com.github.gekoh.yagen.api.Constants;
-import com.github.gekoh.yagen.api.Default;
-import com.github.gekoh.yagen.api.DefaultNamingStrategy;
-import com.github.gekoh.yagen.api.Deferrable;
-import com.github.gekoh.yagen.api.I18NDetailEntityRelation;
 import com.github.gekoh.yagen.api.Index;
-import com.github.gekoh.yagen.api.IntervalPartitioning;
-import com.github.gekoh.yagen.api.LayeredTablesView;
-import com.github.gekoh.yagen.api.NamingStrategy;
-import com.github.gekoh.yagen.api.NoForeignKeyConstraint;
-import com.github.gekoh.yagen.api.Profile;
-import com.github.gekoh.yagen.api.Sequence;
-import com.github.gekoh.yagen.api.TemporalEntity;
 import com.github.gekoh.yagen.api.UniqueConstraint;
+import com.github.gekoh.yagen.api.*;
 import com.github.gekoh.yagen.util.MappingUtils;
+import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import org.apache.commons.lang.StringUtils;
 import org.hibernate.annotations.OnDelete;
 import org.hibernate.annotations.OnDeleteAction;
 
-import javax.persistence.AttributeOverride;
-import javax.persistence.AttributeOverrides;
-import javax.persistence.CollectionTable;
-import javax.persistence.Column;
-import javax.persistence.DiscriminatorValue;
-import javax.persistence.Embedded;
-import javax.persistence.Entity;
-import javax.persistence.EnumType;
-import javax.persistence.Enumerated;
-import javax.persistence.Id;
-import javax.persistence.JoinColumn;
-import javax.persistence.JoinColumns;
-import javax.persistence.JoinTable;
-import javax.persistence.ManyToMany;
-import javax.persistence.ManyToOne;
-import javax.persistence.MappedSuperclass;
-import javax.persistence.OneToMany;
-import javax.persistence.OneToOne;
-import javax.persistence.PrimaryKeyJoinColumn;
-import javax.persistence.Table;
-import javax.persistence.Transient;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.AccessibleObject;
 import java.lang.reflect.Field;
 import java.lang.reflect.Member;
 import java.lang.reflect.Method;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 /**
  * @author Georg Kohlweiss 
@@ -897,17 +856,17 @@ public class TableConfig {
         }
     }
 
-    private static javax.persistence.Table getTableAnnotation(Class type) {
+    private static jakarta.persistence.Table getTableAnnotation(Class type) {
         Class entityClass = getClassOfTableAnnotation(type);
         if (entityClass != null) {
-            return (javax.persistence.Table) entityClass.getAnnotation(javax.persistence.Table.class);
+            return (jakarta.persistence.Table) entityClass.getAnnotation(jakarta.persistence.Table.class);
         }
         return null;
     }
 
     public static Class getClassOfTableAnnotation(Class type) {
         do {
-            if (type.isAnnotationPresent(javax.persistence.Table.class)) {
+            if (type.isAnnotationPresent(jakarta.persistence.Table.class)) {
                 return type;
             }
         } while ((type = type.getSuperclass()) != null);

@@ -66,10 +66,8 @@
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <slf4j.version>1.6.1</slf4j.version>
-        <hibernate.version>5.4.12.Final</hibernate.version>
-<!-- reverting to 5.4 until issue with DDL generation is resolved -->
-        <!-- latest hibernate 5 version supporting java 8 next to 11 and 17, removed dependency to dom4j -->
-<!--        <hibernate.version>5.6.15.Final</hibernate.version>-->
+        <hibernate.version>6.3.1.Final</hibernate.version>
+        <hibernate-annotation.version>6.0.6.Final</hibernate-annotation.version>
         <commons-cli.version>1.2</commons-cli.version>
 
         <!-- github server corresponds to entry in ~/.m2/settings.xml -->
@@ -128,21 +126,27 @@
             </dependency>
 
             <dependency>
-                <groupId>org.hibernate</groupId>
+                <groupId>org.hibernate.orm</groupId>
                 <artifactId>hibernate-core</artifactId>
                 <version>${hibernate.version}</version>
             </dependency>
 
             <dependency>
-                <groupId>org.hibernate</groupId>
-                <artifactId>hibernate-entitymanager</artifactId>
+                <groupId>org.hibernate.orm</groupId>
+                <artifactId>hibernate-ant</artifactId>
                 <version>${hibernate.version}</version>
             </dependency>
 
             <dependency>
-                <groupId>org.hibernate.javax.persistence</groupId>
-                <artifactId>hibernate-jpa-2.1-api</artifactId>
-                <version>1.0.0.Final</version>
+                <groupId>org.hibernate.common</groupId>
+                <artifactId>hibernate-commons-annotations</artifactId>
+                <version>${hibernate-annotation.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>jakarta.persistence</groupId>
+                <artifactId>jakarta.persistence-api</artifactId>
+                <version>3.1.0</version>
             </dependency>
 
             <dependency>
@@ -184,6 +188,15 @@
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.8.1</version>
+                <configuration>
+                    <source>11</source>
+                    <target>11</target>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-source-plugin</artifactId>
                 <version>2.2.1</version>
                 <executions>
@@ -212,11 +225,6 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-release-plugin</artifactId>
                 <version>2.5</version>
-            </plugin>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.8.1</version>
             </plugin>
         </plugins>
     </build>

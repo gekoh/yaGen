@@ -16,35 +16,15 @@
 package com.github.gekoh.yagen.util;
 
 import com.github.gekoh.yagen.api.Constants;
+import jakarta.persistence.*;
 import org.apache.commons.lang.StringUtils;
 import org.hibernate.annotations.Type;
 
-import javax.persistence.AttributeOverride;
-import javax.persistence.AttributeOverrides;
-import javax.persistence.Basic;
-import javax.persistence.CollectionTable;
-import javax.persistence.Column;
-import javax.persistence.Embedded;
-import javax.persistence.EmbeddedId;
-import javax.persistence.Enumerated;
-import javax.persistence.Id;
-import javax.persistence.JoinColumn;
-import javax.persistence.JoinTable;
-import javax.persistence.Lob;
-import javax.persistence.ManyToOne;
-import javax.persistence.OneToMany;
-import javax.persistence.OneToOne;
-import javax.persistence.PrimaryKeyJoinColumn;
-import javax.persistence.Transient;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.AccessibleObject;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -292,11 +272,11 @@ public class FieldInfo {
     }
 
     /**
-     * generates a collection of javax.persistence.AttributeOverride annotations needed to override nullable=false
+     * generates a collection of jakarta.persistence.AttributeOverride annotations needed to override nullable=false
      * columns since this is not allowed in *Hst-Entities
      *
      * @param type embeddable class with non-nullable fields
-     * @return collection of javax.persistence.AttributeOverride annotations needed to set columns to nullable=true
+     * @return collection of jakarta.persistence.AttributeOverride annotations needed to set columns to nullable=true
      */
     private Map<String, String> getAttributeOverrides(Class type) {
         Map<String, String> overrides = new LinkedHashMap<String, String>();
@@ -327,8 +307,8 @@ public class FieldInfo {
                     String columnName = column != null ? column.name() : field.getName();
                     int length = column != null ? column.length() : 255;
 
-                    String override = "@javax.persistence.AttributeOverride(name=\"" + fieldPath + "\", column=" +
-                            "@javax.persistence.Column(name=\"" + columnName + "\", length=" + length + ", nullable=true, unique=false))";
+                    String override = "@jakarta.persistence.AttributeOverride(name=\"" + fieldPath + "\", column=" +
+                            "@jakarta.persistence.Column(name=\"" + columnName + "\", length=" + length + ", nullable=true, unique=false))";
 
                     addAttributeOverride(overrides, override);
                 }
@@ -351,11 +331,11 @@ public class FieldInfo {
     private static final Pattern PATTERN_ATTR_OVERRIDE =  Pattern.compile("(@" + AttributeOverride.class.getName() + "\\([^)]*@" + Column.class.getName() + "\\([^)]*\\)[^)]*\\))(, )?");
 
     /**
-     * merges given collection of javax.persistence.AttributeOverride elements into an optionally existing
-     * javax.persistence.AttributeOverrides annotation with optionally pre-existing javax.persistence.AttributeOverride elements.
+     * merges given collection of jakarta.persistence.AttributeOverride elements into an optionally existing
+     * jakarta.persistence.AttributeOverrides annotation with optionally pre-existing jakarta.persistence.AttributeOverride elements.
      *
-     * @param annotation existing javax.persistence.AttributeOverrides annotation, if any, otherwise it will be created
-     * @param attributeOverrides collection of javax.persistence.AttributeOverride annotation to be appended
+     * @param annotation existing jakarta.persistence.AttributeOverrides annotation, if any, otherwise it will be created
+     * @param attributeOverrides collection of jakarta.persistence.AttributeOverride annotation to be appended
      * @return merged AttributeOverrides annotation
      */
     private static String concatOverrides(String annotation, Collection<String> attributeOverrides) {

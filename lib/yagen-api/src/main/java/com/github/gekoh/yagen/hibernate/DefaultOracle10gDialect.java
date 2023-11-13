@@ -7,7 +7,7 @@
 package com.github.gekoh.yagen.hibernate;
 
 import org.hibernate.boot.model.TypeContributions;
-import org.hibernate.dialect.Oracle10gDialect;
+import org.hibernate.dialect.OracleDialect;
 import org.hibernate.service.ServiceRegistry;
 
 /**
@@ -16,16 +16,16 @@ import org.hibernate.service.ServiceRegistry;
  * @author Hanspeter D&uuml;nnenberger
  * @since 28.04.2020
  */
-public class DefaultOracle10gDialect extends Oracle10gDialect {
+public class DefaultOracle10gDialect extends OracleDialect {
 
     @Override
     public void contributeTypes(TypeContributions typeContributions, ServiceRegistry serviceRegistry) {
         super.contributeTypes(typeContributions, serviceRegistry);
-        typeContributions.contributeType(new BitBooleanType());
+//        typeContributions.contributeType(new BitBooleanType());
     }
 
     @Override
-    public String getCurrentTimestampSQLFunctionName() {
+    public String getCurrentTimestampSelectString() {
         return "systimestamp";
     }
 }
