@@ -543,19 +543,8 @@ public class CreateDDL {
                             .append(getPostgreSQLHistTriggerFunction(dialect, liveTableName, histTableName, histColNameLC, columnNames, pkCols, historyRelevantCols, blobCols, columnMap)).append("\n/");
 
                     buf.append(STATEMENT_SEPARATOR)
-                            .append("create trigger ").append(liveTableName).append("_htU\n")
-                            .append("after update on ").append(liveTableName).append("\n")
-                            .append("for each row\n")
-                            .append("when (");
-                    for (String historyRelevantCol : historyRelevantCols) {
-                        buf.append("new.").append(historyRelevantCol).append(" is distinct from old.").append(historyRelevantCol).append(" or\n");
-                    }
-                    buf.delete(buf.length()-4, buf.length());
-                    buf.append(")\nexecute procedure ").append(liveTableName).append("_htr_function()");
-
-                    buf.append(STATEMENT_SEPARATOR)
                             .append("create trigger ").append(liveTableName).append("_htr\n")
-                            .append("after insert or delete on ").append(liveTableName).append("\n")
+                            .append("after insert or update or delete on ").append(liveTableName).append("\n")
                             .append("for each row\n")
                             .append("execute procedure ").append(liveTableName).append("_htr_function()");
                 }

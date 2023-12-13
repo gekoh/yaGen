@@ -15,13 +15,11 @@
 */
 package com.github.gekoh.yagen.hibernate;
 
-import com.github.gekoh.yagen.api.DefaultNamingStrategy;
 import com.github.gekoh.yagen.util.DBHelper;
 import org.apache.commons.lang.StringUtils;
 import org.hibernate.SessionFactory;
 import org.hibernate.annotations.common.reflection.XClass;
 import org.hibernate.boot.Metadata;
-import org.hibernate.boot.model.naming.PhysicalNamingStrategy;
 import org.hibernate.boot.model.relational.Sequence;
 import org.hibernate.cfg.Configuration;
 import org.hibernate.dialect.Dialect;
@@ -45,6 +43,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.Iterator;
@@ -137,6 +136,12 @@ public class PatchGlue {
             return returnValue;
         }
         Dialect dialect = metadata.getDatabase().getDialect();
+        Object ddlEnhancer = getDDLEnhancerFromDialect(dialect);
+
+        if (ddlEnhancer == null) {
+            return returnValue;
+        }
+
         StringBuffer buf = new StringBuffer(returnValue[0]);
 
         Map<String, Column> allColumns = new LinkedHashMap<String, Column>();
@@ -146,18 +151,13 @@ public class PatchGlue {
             allColumns.put(column.getName().toLowerCase(), column);
         }
 
-        Object ddlEnhancer = getDDLEnhancerFromDialect(dialect);
-        if (ddlEnhancer != null) {
-            try {
-                returnValue[0] = (String) (createNotDrop ?
-                        ReflectExecutor.m_updateCreateTable.get().invoke(ddlEnhancer, dialect, buf.append(dialect.getTableTypeString()), objectName, allColumns) :
-                        ReflectExecutor.m_updateDropTable.get().invoke(ddlEnhancer, dialect, buf, objectName));
-            } catch (Exception e) {
-                throw new IllegalStateException(e);
-            }
+        try {
+            return spoilSqlStrings(returnValue, (String) (createNotDrop ?
+                            ReflectExecutor.m_updateCreateTable.get().invoke(ddlEnhancer, dialect, buf.append(dialect.getTableTypeString()), objectName, allColumns) :
+                            ReflectExecutor.m_updateDropTable.get().invoke(ddlEnhancer, dialect, buf, objectName)));
+        } catch (Exception e) {
+            throw new IllegalStateException(e);
         }
-
-        return returnValue;
     }
 
     public static String[] afterConstraintSqlString(boolean createNotDrop, Constraint constraint, Metadata metadata, String[] returnValue) {
@@ -169,18 +169,19 @@ public class PatchGlue {
             return returnValue;
         }
         Dialect dialect = metadata.getDatabase().getDialect();
-        StringBuffer buf = new StringBuffer(returnValue[0]);
-
         Object ddlEnhancer = getDDLEnhancerFromDialect(dialect);
-        if (ddlEnhancer != null) {
-            try {
-                returnValue[0] = (String) ReflectExecutor.m_updateCreateConstraint.get().invoke(ddlEnhancer, dialect, buf, objectName, constraint.getTable(), constraint);
-            } catch (Exception e) {
-                throw new IllegalStateException(e);
-            }
+
+        if (ddlEnhancer == null) {
+            return returnValue;
         }
 
-        return returnValue;
+        StringBuffer buf = new StringBuffer(returnValue[0]);
+
+        try {
+            return spoilSqlStrings(returnValue, (String) ReflectExecutor.m_updateCreateConstraint.get().invoke(ddlEnhancer, dialect, buf, objectName, constraint.getTable(), constraint));
+        } catch (Exception e) {
+            throw new IllegalStateException(e);
+        }
     }
 
     public static String[] afterIndexSqlString(boolean createNotDrop, Index index, Metadata metadata, String[] returnValue) {
@@ -192,6 +193,12 @@ public class PatchGlue {
             return returnValue;
         }
         Dialect dialect = metadata.getDatabase().getDialect();
+        Object ddlEnhancer = getDDLEnhancerFromDialect(dialect);
+
+        if (ddlEnhancer == null) {
+            return returnValue;
+        }
+
         StringBuffer buf = new StringBuffer(returnValue[0]);
 
         List<Column> columnList = new ArrayList<Column>();
@@ -201,16 +208,11 @@ public class PatchGlue {
             columnList.add(column);
         }
 
-        Object ddlEnhancer = getDDLEnhancerFromDialect(dialect);
-        if (ddlEnhancer != null) {
-            try {
-                returnValue[0] = (String) ReflectExecutor.m_updateCreateIndex.get().invoke(ddlEnhancer, dialect, buf, objectName, index.getTable(), columnList);
-            } catch (Exception e) {
-                throw new IllegalStateException(e);
-            }
+        try {
+            return spoilSqlStrings(returnValue, (String) ReflectExecutor.m_updateCreateIndex.get().invoke(ddlEnhancer, dialect, buf, objectName, index.getTable(), columnList));
+        } catch (Exception e) {
+            throw new IllegalStateException(e);
         }
-
-        return returnValue;
     }
 
     public static String[] afterSequenceSqlString(boolean createNotDrop, Sequence sequence, Metadata metadata, String[] returnValue) {
@@ -222,17 +224,26 @@ public class PatchGlue {
             return returnValue;
         }
         Dialect dialect = metadata.getDatabase().getDialect();
-
         Object ddlEnhancer = getDDLEnhancerFromDialect(dialect);
-        if (ddlEnhancer != null) {
-            try {
-                returnValue[0] = (String) ReflectExecutor.m_updateCreateSequence.get().invoke(ddlEnhancer, dialect, returnValue[0]);
-            } catch (Exception e) {
-                throw new IllegalStateException(e);
-            }
+
+        if (ddlEnhancer == null) {
+            return returnValue;
         }
 
-        return returnValue;
+        try {
+            return spoilSqlStrings(returnValue, (String) ReflectExecutor.m_updateCreateSequence.get().invoke(ddlEnhancer, dialect, returnValue[0]));
+        } catch (Exception e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    private static String[] spoilSqlStrings(String[] sqlStrings, String modifiedMainSql) {
+        ArrayList<String> sqlList = new ArrayList<>(Arrays.asList(sqlStrings));
+        sqlList.remove(0);
+
+        sqlList.addAll(0, splitSQL(modifiedMainSql));
+
+        return sqlList.toArray(new String[0]);
     }
 
     public static Object getDDLEnhancerFromDialect(Dialect dialect) {

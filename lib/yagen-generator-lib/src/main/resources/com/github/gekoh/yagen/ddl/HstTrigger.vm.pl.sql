@@ -31,8 +31,27 @@ begin
 #end
 
 #if( !$is_postgres )
+  if ${new}.rowid<>${old}.rowid then
+    update hst_modified_row set row_id=${new}.rowid
+      where table_name=live_table_name
+        and row_id=${old}.rowid;
+  end if;
+#else
+
+  if (hst_operation = 'U') and ${new}.ctid <> ${old}.ctid then
+    update hst_modified_row set row_id=${new}.ctid
+      where transaction_id=txid_current() and table_name=live_table_name
+        and row_id=${old}.ctid;
+  end if;
+#end
+
+#if( !$is_postgres )
   if inserting or deleting
+#else
+  if hst_operation in ('I', 'D')
+#end
 #foreach( $column in $histRelevantCols )
+#if( !$is_postgres )
   or ((${new}.$column is null and ${old}.$column is not null) or
       (${new}.$column is not null and ${old}.$column is null) or
 #if( $is_oracle && $blobCols.contains($column) )
@@ -40,10 +59,12 @@ begin
 #else
       ${new}.$column!=${old}.$column)
 #end
+#else
+  or ${new}.$column is distinct from ${old}.$column
+#end
 #end
   then
 
-#end
     begin
       select transaction_timestamp into #if($is_postgres)strict #{end}transaction_timestamp_found
       from HST_CURRENT_TRANSACTION
@@ -53,21 +74,6 @@ begin
       insert into HST_CURRENT_TRANSACTION (transaction_id, transaction_timestamp)
         values (#if($is_postgres)txid_current()#{else}DBMS_TRANSACTION.LOCAL_TRANSACTION_ID#{end}, transaction_timestamp_found);
     end;
-
-#if( !$is_postgres )
-    if ${new}.rowid<>${old}.rowid then
-      update hst_modified_row set row_id=${new}.rowid
-        where table_name=live_table_name
-          and row_id=${old}.rowid;
-    end if;
-#else
-
-    if (hst_operation  = 'U') and ${new}.ctid <> ${old}.ctid then
-      update hst_modified_row set row_id=${new}.ctid
-        where transaction_id=txid_current() and table_name=live_table_name
-          and row_id=${old}.ctid;
-    end if;
-#end
 
     begin
       insert into hst_modified_row values (#if($is_postgres)txid_current(), #{end}live_table_name, live_rowid, hst_operation, '${hstTableName}', hst_uuid_used);
@@ -154,11 +160,9 @@ begin
       end if;
     end if;
 
-#if( $is_postgres )
-  return new;
-#else
   end if;
-#end
-end;#if( $is_postgres )
-
+#if( !$is_postgres )
+end;#else
+  return new;
+end;
 $$ LANGUAGE 'plpgsql';#end
