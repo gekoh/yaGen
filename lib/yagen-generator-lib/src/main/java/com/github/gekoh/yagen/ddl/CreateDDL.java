@@ -609,7 +609,8 @@ public class CreateDDL {
 
             if (matcher.find()) {
                 sqlCreate = sqlCreate.substring(0, matcher.start(TBL_PATTERN_IDX_TBL_SYN)) + "global temporary " +
-                        sqlCreate.substring(matcher.start(TBL_PATTERN_IDX_TBL_SYN), matcher.end(TBL_PATTERN_IDX_TBL_DEF)+1) +
+                        (dialect.supportsIfExistsBeforeTableName() ? sqlCreate.substring(matcher.start(TBL_PATTERN_IDX_TBL_SYN), matcher.start(TBL_PATTERN_IDX_TBLNAME)) + "IF NOT EXISTS " + sqlCreate.substring(matcher.start(TBL_PATTERN_IDX_TBLNAME), matcher.end(TBL_PATTERN_IDX_TBL_DEF)+1) :
+                                sqlCreate.substring(matcher.start(TBL_PATTERN_IDX_TBL_SYN), matcher.end(TBL_PATTERN_IDX_TBL_DEF)+1)) +
                         " ON COMMIT " + table.globalTemporaryOnCommit() + sqlCreate.substring(matcher.end(TBL_PATTERN_IDX_TBL_DEF)+1);
             }
         }

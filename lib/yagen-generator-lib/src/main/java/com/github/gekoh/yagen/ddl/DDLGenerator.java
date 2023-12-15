@@ -398,6 +398,15 @@ public class DDLGenerator {
 
         public void setMetadata(Metadata metadata) {
             this.metadata = metadata;
+            Map configurationValues = DBHelper.getConfigurationValues(metadata);
+            String ns = (String) (configurationValues != null ? configurationValues.get("hibernate.physical_naming_strategy") : null);
+            if (ns != null) {
+                try {
+                    setNamingStrategy((NamingStrategy) Class.forName(ns).newInstance());
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+            }
         }
 
         @Override
