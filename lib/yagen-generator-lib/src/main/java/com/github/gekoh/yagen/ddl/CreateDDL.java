@@ -703,7 +703,12 @@ public class CreateDDL {
             if (priority > 1) {
                 viewSource.append("  union all\n");
             }
-            viewSource.append("  select t.*, ").append(priority).append(" priority\n").append("  from ").append(tableName).append(" t\n");
+            viewSource.append("  select t.*, ").append(priority).append(" priority\n").append("  from ").append(tableName).append(" t");
+
+            if (priority <= layeredTablesView.wheresInOrder().length) {
+                viewSource.append(" ").append(layeredTablesView.wheresInOrder()[priority-1]);
+            }
+            viewSource.append("\n");
         }
 
         viewSource.append(
