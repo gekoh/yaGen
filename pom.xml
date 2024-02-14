@@ -25,7 +25,7 @@
 
     <groupId>com.github.gekoh.yagen</groupId>
     <artifactId>yagen-master</artifactId>
-    <version>5.26-SNAPSHOT</version>
+    <version>5.26</version>
     <packaging>pom</packaging>
     <name>yaGen - yet another Generator</name>
     <description>
@@ -52,7 +52,7 @@
         <connection>scm:git:git@github.com:gekoh/yaGen.git</connection>
         <developerConnection>scm:git:git@github.com:gekoh/yaGen.git</developerConnection>
         <url>git@github.com:gekoh/yaGen.git</url>
-      <tag>HEAD</tag>
+      <tag>yagen-master-5.26</tag>
   </scm>
 
     <modules>
