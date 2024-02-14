@@ -126,6 +126,18 @@ public class PatchGlue {
         }
     }
 
+    public static Object getProfileFrom(Dialect dialect) {
+        Object enhancer = getDDLEnhancerFromDialect(dialect);
+        if (enhancer != null) {
+            try {
+                return ReflectExecutor.m_getProfile.get().invoke(enhancer);
+            } catch (Exception e) {
+                throw new IllegalStateException(e);
+            }
+        }
+        return null;
+    }
+
     public static void sortEntityClasses(List<XClass> classes) {
         classes.sort(Comparator.comparing(XClass::getName));
     }
