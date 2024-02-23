@@ -11,7 +11,13 @@ import jakarta.persistence.*;
 @com.github.gekoh.yagen.api.Table(shortName = "IBB")
 @LayeredTablesView(
         keyColumns = { "AC_CALL_SIGN", "NUMENTRY" },
-        tableNamesInOrder = { "IMP_BOARD_BOOK_COR", "IMP_BOARD_BOOK_XST", "IMP_BOARD_BOOK", "IMP_BOARD_BOOK_SYN" }
+        tableNamesInOrder = { "IMP_BOARD_BOOK_COR", "IMP_BOARD_BOOK_XST", "IMP_BOARD_BOOK", "IMP_BOARD_BOOK_SYN" },
+        wheresInOrder = {
+                "",
+                "",
+                "where t.AC_CALL_SIGN not in (select AC_CALL_SIGN from IMP_BOARD_BOOK_XST)",
+                "where t.AC_CALL_SIGN not in (select AC_CALL_SIGN from IMP_BOARD_BOOK_XST)"
+        }
 )
 public class ImpBoardBook {
     //private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(ImpBoardBook.class);

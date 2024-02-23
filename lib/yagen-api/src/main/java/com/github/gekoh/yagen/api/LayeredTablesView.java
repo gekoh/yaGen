@@ -17,4 +17,11 @@ public @interface LayeredTablesView {
     String[] keyColumns();
 
     String[] tableNamesInOrder();
+
+    /**
+     * Optional where conditions to allow excluding layer table records e.g. when primary key consists
+     * of multiple records and only a part of the PK defines record exclude from layer table.
+     * @return when used must provide a value for each entry in {@link #tableNamesInOrder()}
+     */
+    String[] wheresInOrder() default {};
 }
