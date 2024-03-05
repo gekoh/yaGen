@@ -11,7 +11,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static com.github.gekoh.yagen.hibernate.PatchGlue.STATEMENT_SEPARATOR;
+import static com.github.gekoh.yagen.hibernate.DdlPatchHelper.STATEMENT_SEPARATOR;
 
 public class ExampleProfileProvider implements ProfileProvider {
 

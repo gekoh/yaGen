@@ -15,10 +15,10 @@
 */
 package com.github.gekoh.yagen.ddl;
 
-import com.github.gekoh.yagen.api.DefaultNamingStrategy;
-import com.github.gekoh.yagen.api.NamingStrategy;
 import com.github.gekoh.yagen.api.TemporalEntity;
-import com.github.gekoh.yagen.hibernate.PatchGlue;
+import com.github.gekoh.yagen.hibernate.DdlPatchHelper;
+import com.github.gekoh.yagen.hibernate.DefaultNamingStrategy;
+import com.github.gekoh.yagen.hibernate.NamingStrategy;
 import com.github.gekoh.yagen.util.DBHelper;
 import jakarta.persistence.EntityManagerFactory;
 import jakarta.persistence.MappedSuperclass;
@@ -26,22 +26,39 @@ import jakarta.persistence.Persistence;
 import jakarta.persistence.metamodel.EntityType;
 import org.apache.velocity.VelocityContext;
 import org.apache.velocity.app.Velocity;
-import org.hibernate.SessionFactory;
 import org.hibernate.boot.Metadata;
 import org.hibernate.boot.MetadataSources;
 import org.hibernate.boot.model.naming.PhysicalNamingStrategy;
 import org.hibernate.boot.registry.StandardServiceRegistryBuilder;
 import org.hibernate.dialect.Dialect;
+import org.hibernate.jpa.boot.internal.ParsedPersistenceXmlDescriptor;
+import org.hibernate.jpa.boot.internal.PersistenceXmlParser;
+import org.hibernate.jpa.boot.spi.Bootstrap;
 import org.hibernate.mapping.PersistentClass;
 import org.hibernate.service.ServiceRegistry;
 import org.hibernate.tool.hbm2ddl.SchemaExport;
 import org.hibernate.tool.schema.TargetType;
 
-import java.io.*;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.Reader;
+import java.io.StringWriter;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.time.LocalDateTime;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -59,7 +76,7 @@ public class DDLGenerator {
         export.setFormat(true);
         export.setOutputFile(profile.getOutputFile());
         Metadata metadata = new SchemaExportHelper(profile.getPersistenceUnitName()).createSchemaExportMetadata();
-        PatchGlue.initDialect(profile, metadata);
+        DdlPatchHelper.initDialect(profile, metadata);
         export.createOnly(EnumSet.of(TargetType.SCRIPT), metadata);
 
         LOG.info("schema script written to file {}", profile.getOutputFile());
@@ -75,14 +92,18 @@ public class DDLGenerator {
 
         public Metadata createSchemaExportMetadata() {
 
-            EntityManagerFactory entityManagerFactory = Persistence.createEntityManagerFactory(persistenceUnitName);
-
             try {
-                return PatchGlue.extractMetadata((SessionFactory) entityManagerFactory);
+                Optional<ParsedPersistenceXmlDescriptor> persistenceDescriptor = PersistenceXmlParser.locatePersistenceUnits(Collections.emptyMap())
+                        .stream().filter(p -> persistenceUnitName.equals(p.getName()))
+                        .findFirst();
+                if (persistenceDescriptor.isPresent()) {
+                    return Bootstrap.getEntityManagerFactoryBuilder(persistenceDescriptor.get(), Collections.emptyMap()).metadata();
+                }
             } catch (Exception ignored) {
                 LOG.warn("unable to get genuine JPA metadata, need to recreate from java entity classes only");
             }
 
+            EntityManagerFactory entityManagerFactory = Persistence.createEntityManagerFactory(persistenceUnitName);
             ServiceRegistry serviceRegistry =
                 new StandardServiceRegistryBuilder()
                         .applySettings(entityManagerFactory.getProperties())

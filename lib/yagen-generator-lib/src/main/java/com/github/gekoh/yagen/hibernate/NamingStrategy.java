@@ -13,8 +13,12 @@
  See the License for the specific language governing permissions and
  limitations under the License.
 */
-package com.github.gekoh.yagen.api;
+package com.github.gekoh.yagen.hibernate;
 
+import com.github.gekoh.yagen.api.CheckConstraint;
+import com.github.gekoh.yagen.api.Index;
+import com.github.gekoh.yagen.api.Table;
+import com.github.gekoh.yagen.api.UniqueConstraint;
 import org.hibernate.boot.model.naming.PhysicalNamingStrategy;
 import org.hibernate.mapping.Constraint;
 

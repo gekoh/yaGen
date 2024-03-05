@@ -13,10 +13,17 @@
  See the License for the specific language governing permissions and
  limitations under the License.
 */
-package com.github.gekoh.yagen.ddl.comment;
+package com.github.gekoh.yagen.hibernate;
+
+import com.github.gekoh.yagen.ddl.CreateDDL;
+import com.github.gekoh.yagen.ddl.DDLGenerator;
+import org.hibernate.boot.Metadata;
 
 /**
- * @author Georg Kohlweiss
+ * @author Georg Kohlweiss 
  */
-public interface Metadata {
+public interface DDLEnhancerAware {
+    void initDDLEnhancer(DDLGenerator.Profile profile, Metadata metadata);
+    CreateDDL getDDLEnhancer();
+    Metadata getMetadata();
 }

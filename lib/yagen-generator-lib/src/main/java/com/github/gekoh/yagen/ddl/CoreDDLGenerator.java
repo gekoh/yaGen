@@ -15,8 +15,6 @@
 */
 package com.github.gekoh.yagen.ddl;
 
-import com.github.gekoh.yagen.hibernate.ReflectExecutor;
-import com.github.gekoh.yagen.hibernate.YagenInit;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.GnuParser;
@@ -57,11 +55,6 @@ public class CoreDDLGenerator {
 
     public static void main(String[] args) {
         try {
-            YagenInit.init();
-        } catch (Exception e) {
-            throw new IllegalStateException("cannot init patches for ddl generator", e);
-        }
-        try {
             generateFrom(createProfileFrom(args));
         } catch (ParseException e) {
             LOG.error("error parsing arguments", e);
@@ -100,7 +93,7 @@ public class CoreDDLGenerator {
 
             if (cl.hasOption(PARAM_PERSISTENCE_UNIT_NAME)) {
                 String persistenceUnit = cl.getOptionValue(PARAM_PERSISTENCE_UNIT_NAME);
-                profile = (DDLGenerator.Profile) ReflectExecutor.m_createProfile.get().invoke(null, "ddl-gen_" + persistenceUnit, persistenceUnit);
+                profile = DDLGenerator.createProfile("ddl-gen_" + persistenceUnit, persistenceUnit);
 
                 profile.setPersistenceUnitName(persistenceUnit);
             }

@@ -22,36 +22,22 @@ About
 -
 This is no stand-alone DDL generator but uses Hibernate hbm2ddl generation tool
 and just extends functionality and enhances DDL output.
-Since Hibernate did not support interceptors or plugins or whatsoever for being able to
-alter the generated DDL it is required to patch the class files before they are
-loaded by the class loader. Bytecode modifications are done using javassist library.
 
 Since yaGen is facilitating Hibernate's hbm2ddl functionality we get all the enhancements 
 in dumped DDL as well as with initialized in-memory-DBs. 
 
-So basically yaGen only kicks in when 
-* some Hibernate classes have been patched before loading via class loader and 
+So basically yaGen only kicks in when
 * Hibernate is executing hbm2ddl (class `org.hibernate.tool.hbm2ddl.SchemaExport`)
 
 ## Initialization
 
-### Agent
-The easiest way of accomplishing class patching e.g. in a working setup is to use
-the yaGen java agent when starting the JVM (like `-javaagent:${project.build.directory}/agents/yagen-agent.jar`, 
-see `lib/yagen-example-domain/pom.xml`).
-
-### Static
-This is only possible if Hibernate classes not have been loaded yet until initializing class
-is referenced. See `com.github.gekoh.yagen.example.test.TestBase` which is used for JUnit tests.
+### Hibernate Schema Management Tool
+Yagen works by extending the standard `HibernateSchemaManagementTool` provided by Hibernate.
+You need to put 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    static {
-        try {
-            YagenInit.init();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
+    <property name="hibernate.schema_management_tool" value="com.github.gekoh.yagen.hibernate.schema.SchemaManagementToolWrapper"/>
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+as one of the `<persistence-unit>/<properties>` in your `persistence.xml`
 
 ## Configuration
 ### Persistence Unit properties
@@ -62,6 +48,9 @@ is referenced. See `com.github.gekoh.yagen.example.test.TestBase` which is used 
 * `yagen.generator.bypass.implement` when set to `true` yaGen will generate trigger bypass functionality into the
   trigger sources to be able to disable particular (or all) triggers at runtime (see static
   helper method `com.github.gekoh.yagen.util.DBHelper.setBypass`)
+* `hibernate.schema_management_tool` must be set to `com.github.gekoh.yagen.hibernate.schema.SchemaManagementToolWrapper` 
+  in order for Yagen to do its magic.
+
 
 ### System properties
 
@@ -89,10 +78,3 @@ If only DDL output is required this can be done via executing java class
 `com.github.gekoh.yagen.ddl.CoreDDLGenerator`
 e.g. with maven plugin (see profile `ddl-gen` within `lib/yagen-example-domain/pom.xml`).
 Note that you need a working JPA configuration using hibernate in classpath.
-
-### Dump with comments
-YaGen also can generate table and column comments (for Oracle RDBMS) which are extracted
-from javadoc source on class and field level. In this case we need to call the javadoc
-Doclet functionality which might not be available with specific JVM versions.
-See usage of `com.github.gekoh.yagen.ddl.comment.CommentsDDLGenerator` with profile
-`ddl-gen-with-tabNcol-comments` in `lib/yagen-example-domain/pom.xml`.

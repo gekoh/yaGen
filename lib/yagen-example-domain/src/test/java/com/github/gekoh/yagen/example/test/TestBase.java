@@ -9,8 +9,7 @@ package com.github.gekoh.yagen.example.test;
 import com.github.gekoh.yagen.ddl.CreateDDL;
 import com.github.gekoh.yagen.ddl.ObjectType;
 import com.github.gekoh.yagen.example.ddl.ExampleProfileProvider;
-import com.github.gekoh.yagen.hibernate.DDLEnhancer;
-import com.github.gekoh.yagen.hibernate.YagenInit;
+import com.github.gekoh.yagen.hibernate.DDLEnhancerAware;
 import com.github.gekoh.yagen.util.DBHelper;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
@@ -29,14 +28,6 @@ public abstract class TestBase {
 
     protected static EntityManagerFactory emf;
 
-    static {
-        try {
-            YagenInit.init();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-
     protected EntityManager em;
 
     public EntityManagerFactory getEntityManagerFactory() {
@@ -52,7 +43,7 @@ public abstract class TestBase {
     @Before
     public void setup() {
         em = getEntityManagerFactory().createEntityManager();
-        ddlMap = ((ExampleProfileProvider.Profile) ((CreateDDL) ((DDLEnhancer) DBHelper.getDialect(em)).getDDLEnhancer()).getProfile()).getRecordedDdl();
+        ddlMap = ((ExampleProfileProvider.Profile) ((CreateDDL) ((DDLEnhancerAware) DBHelper.getDialect(em)).getDDLEnhancer()).getProfile()).getRecordedDdl();
     }
 
     @After

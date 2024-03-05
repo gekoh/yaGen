@@ -15,10 +15,25 @@
 */
 package com.github.gekoh.yagen.ddl;
 
+import com.github.gekoh.yagen.api.AuditInfo;
+import com.github.gekoh.yagen.api.Auditable;
+import com.github.gekoh.yagen.api.Changelog;
 import com.github.gekoh.yagen.api.CheckConstraint;
+import com.github.gekoh.yagen.api.Constants;
+import com.github.gekoh.yagen.api.Default;
+import com.github.gekoh.yagen.api.Deferrable;
+import com.github.gekoh.yagen.api.Generated;
 import com.github.gekoh.yagen.api.Index;
-import com.github.gekoh.yagen.api.*;
-import com.github.gekoh.yagen.hibernate.PatchGlue;
+import com.github.gekoh.yagen.api.IntervalPartitioning;
+import com.github.gekoh.yagen.api.LayeredTablesView;
+import com.github.gekoh.yagen.api.NoForeignKeyConstraint;
+import com.github.gekoh.yagen.api.Profile;
+import com.github.gekoh.yagen.api.Sequence;
+import com.github.gekoh.yagen.api.TemporalEntity;
+import com.github.gekoh.yagen.api.UniqueConstraint;
+import com.github.gekoh.yagen.hibernate.DdlPatchHelper;
+import com.github.gekoh.yagen.hibernate.DefaultNamingStrategy;
+import com.github.gekoh.yagen.hibernate.NamingStrategy;
 import com.github.gekoh.yagen.hst.CreateEntities;
 import com.github.gekoh.yagen.util.DBHelper;
 import com.github.gekoh.yagen.util.FieldInfo;
@@ -30,22 +45,43 @@ import org.apache.commons.lang.StringUtils;
 import org.apache.velocity.VelocityContext;
 import org.apache.velocity.app.Velocity;
 import org.hibernate.dialect.Dialect;
+import org.hibernate.mapping.Column;
+import org.hibernate.mapping.Constraint;
+import org.hibernate.mapping.ForeignKey;
+import org.hibernate.mapping.PrimaryKey;
 import org.hibernate.mapping.Table;
-import org.hibernate.mapping.*;
+import org.hibernate.mapping.UniqueKey;
 
-import java.io.*;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.Reader;
+import java.io.SequenceInputStream;
+import java.io.StringReader;
+import java.io.StringWriter;
+import java.io.UnsupportedEncodingException;
+import java.io.Writer;
 import java.lang.annotation.Annotation;
 import java.sql.Types;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.*;
+import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import static com.github.gekoh.yagen.hibernate.PatchGlue.STATEMENT_SEPARATOR;
-import static com.github.gekoh.yagen.util.DBHelper.*;
+import static com.github.gekoh.yagen.hibernate.DdlPatchHelper.STATEMENT_SEPARATOR;
+import static com.github.gekoh.yagen.util.DBHelper.isHsqlDb;
+import static com.github.gekoh.yagen.util.DBHelper.isOracle;
+import static com.github.gekoh.yagen.util.DBHelper.isPostgres;
 
 /**
  * @author Georg Kohlweiss
@@ -152,16 +188,12 @@ public class CreateDDL {
     private Integer maxObjectNameLength; // specified by persistence unit property yagen.generator.db.constraints.max-object-name-length
     private Integer maxTableNameLength; // derived from maxObjectNameLength
 
-    public CreateDDL(Object profile, Dialect dialect) {
-        if (!(profile instanceof DDLGenerator.Profile)) {
-            throw new IllegalArgumentException("profile parameter needs to be an instance of " + DDLGenerator.Profile.class.getName());
-        }
-        DDLGenerator.Profile profileT = (DDLGenerator.Profile) profile;
-        init(profileT);
+    public CreateDDL(DDLGenerator.Profile profile, Dialect dialect) {
+        init(profile);
         initViewsAndRegisterDDLs(dialect);
 
-        if (profileT.getMetadata() != null) {
-            Map configurationValues = DBHelper.getConfigurationValues(profileT.getMetadata());
+        if (profile.getMetadata() != null) {
+            Map configurationValues = DBHelper.getConfigurationValues(profile.getMetadata());
 
             if (configurationValues != null) {
                 Object length = configurationValues.get(PARAM_MAX_LEN_OBJECT_NAME);
@@ -366,7 +398,7 @@ public class CreateDDL {
 
                 idx = colMatcher.end();
             }
-            return PatchGlue.splitSQL(updateCreateTable(dialect, new StringBuffer(tableCreate), tableName, columns));
+            return DdlPatchHelper.splitSQL(updateCreateTable(dialect, new StringBuffer(tableCreate), tableName, columns));
         }
         return Collections.singleton(tableCreate);
     }

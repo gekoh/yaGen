@@ -17,7 +17,7 @@
 dependencies {
     compile project(':lib:yagen-generator-lib')
 
-    compile 'org.hibernate.jakarta.persistence:hibernate-jpa-2.0-api:1.0.1.Final'
+    compile 'jakarta.persistence:jakarta.persistence-api:3.1.0'
 
     runtime 'org.slf4j:slf4j-log4j12:1.6.1'
     runtime 'joda-time:joda-time-hibernate:1.3'

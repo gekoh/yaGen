@@ -15,7 +15,7 @@
 */
 package com.github.gekoh.yagen.util;
 
-import com.github.gekoh.yagen.hibernate.DDLEnhancer;
+import com.github.gekoh.yagen.hibernate.DDLEnhancerAware;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.NoResultException;
 import org.hibernate.Session;
@@ -31,7 +31,13 @@ import org.hibernate.type.descriptor.sql.spi.DdlTypeRegistry;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
-import java.sql.*;
+import java.sql.CallableStatement;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Timestamp;
+import java.sql.Types;
 import java.util.Map;
 import java.util.UUID;
 import java.util.regex.Pattern;
@@ -347,7 +353,7 @@ public class DBHelper {
 
     public static Metadata getMetadata(Dialect dialect) {
         Object metadataObj;
-        if (!(dialect instanceof DDLEnhancer) || (metadataObj = ((DDLEnhancer) dialect).getMetadata()) == null) {
+        if (!(dialect instanceof DDLEnhancerAware) || (metadataObj = ((DDLEnhancerAware) dialect).getMetadata()) == null) {
             return null;
         }
         return (Metadata) metadataObj;

@@ -15,12 +15,47 @@
 */
 package com.github.gekoh.yagen.ddl;
 
+import com.github.gekoh.yagen.api.Auditable;
+import com.github.gekoh.yagen.api.CascadeDelete;
+import com.github.gekoh.yagen.api.CascadeNullable;
+import com.github.gekoh.yagen.api.Changelog;
+import com.github.gekoh.yagen.api.CheckConstraint;
+import com.github.gekoh.yagen.api.Constants;
+import com.github.gekoh.yagen.api.Default;
+import com.github.gekoh.yagen.api.Deferrable;
+import com.github.gekoh.yagen.api.I18NDetailEntityRelation;
 import com.github.gekoh.yagen.api.Index;
+import com.github.gekoh.yagen.api.IntervalPartitioning;
+import com.github.gekoh.yagen.api.LayeredTablesView;
+import com.github.gekoh.yagen.api.NoForeignKeyConstraint;
+import com.github.gekoh.yagen.api.Profile;
+import com.github.gekoh.yagen.api.Sequence;
+import com.github.gekoh.yagen.api.TemporalEntity;
 import com.github.gekoh.yagen.api.UniqueConstraint;
-import com.github.gekoh.yagen.api.*;
+import com.github.gekoh.yagen.hibernate.DefaultNamingStrategy;
+import com.github.gekoh.yagen.hibernate.NamingStrategy;
 import com.github.gekoh.yagen.util.MappingUtils;
+import jakarta.persistence.AttributeOverride;
+import jakarta.persistence.AttributeOverrides;
+import jakarta.persistence.CollectionTable;
+import jakarta.persistence.Column;
+import jakarta.persistence.DiscriminatorValue;
+import jakarta.persistence.Embedded;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.JoinColumns;
+import jakarta.persistence.JoinTable;
+import jakarta.persistence.ManyToMany;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.MappedSuperclass;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.OneToOne;
+import jakarta.persistence.PrimaryKeyJoinColumn;
 import jakarta.persistence.Table;
-import jakarta.persistence.*;
+import jakarta.persistence.Transient;
 import org.apache.commons.lang.StringUtils;
 import org.hibernate.annotations.OnDelete;
 import org.hibernate.annotations.OnDeleteAction;
@@ -30,7 +65,13 @@ import java.lang.reflect.AccessibleObject;
 import java.lang.reflect.Field;
 import java.lang.reflect.Member;
 import java.lang.reflect.Method;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * @author Georg Kohlweiss 

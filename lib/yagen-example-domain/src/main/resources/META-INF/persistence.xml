@@ -30,6 +30,7 @@
             <property name="hibernate.temp.use_jdbc_metadata_defaults" value="false"/>
             <property name="yagen.generator.bypass.implement" value="true"/>
             <property name="yagen.generator.profile.providerClass" value="com.github.gekoh.yagen.example.ddl.ExampleProfileProvider"/>
+            <property name="hibernate.schema_management_tool" value="com.github.gekoh.yagen.hibernate.schema.SchemaManagementToolWrapper"/>
         </properties>
 
     </persistence-unit>

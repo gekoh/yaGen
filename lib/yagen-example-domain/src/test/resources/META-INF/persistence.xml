@@ -33,6 +33,7 @@
             <property name="hibernate.hbm2ddl.auto" value="create"/>
             <property name="hibernate.show_sql" value="true"/>
             <property name="hibernate.format_sql" value="true"/>
+            <property name="hibernate.schema_management_tool" value="com.github.gekoh.yagen.hibernate.schema.SchemaManagementToolWrapper"/>
 
             <property name="yagen.generator.bypass.implement" value="true"/>
             <property name="yagen.generator.profile.providerClass" value="com.github.gekoh.yagen.example.ddl.ExampleProfileProvider$AddImportTimestampProvider"/>
@@ -57,6 +58,7 @@
             <property name="hibernate.hbm2ddl.auto" value="create"/>
             <property name="hibernate.show_sql" value="false"/>
             <property name="hibernate.format_sql" value="true"/>
+            <property name="hibernate.schema_management_tool" value="com.github.gekoh.yagen.hibernate.schema.SchemaManagementToolWrapper"/>
 
             <property name="yagen.generator.bypass.implement" value="true"/>
             <property name="yagen.generator.profile.providerClass" value="com.github.gekoh.yagen.example.ddl.ExampleProfileProvider$AddImportTimestampProvider"/>
@@ -81,6 +83,7 @@
             <property name="hibernate.hbm2ddl.auto" value="create"/>
             <property name="hibernate.show_sql" value="false"/>
             <property name="hibernate.format_sql" value="true"/>
+            <property name="hibernate.schema_management_tool" value="com.github.gekoh.yagen.hibernate.schema.SchemaManagementToolWrapper"/>
 
             <property name="yagen.generator.bypass.implement" value="true"/>
             <property name="yagen.generator.profile.providerClass" value="com.github.gekoh.yagen.example.ddl.ExampleProfileProvider$AddImportTimestampProvider"/>
