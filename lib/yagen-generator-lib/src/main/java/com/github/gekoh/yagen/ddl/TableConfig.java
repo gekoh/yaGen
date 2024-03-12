@@ -106,7 +106,6 @@ public class TableConfig {
     private List<Index> indexes = new ArrayList<Index>();
 
     private Map<String, AccessibleObject> columnNameToAccessibleObject = new HashMap<String, AccessibleObject>();
-    private Map<String, String> columnNameToEnumCheckConstraints = new HashMap<String, String>();
     private Map<String, Deferrable> columnNameToDeferrable = new HashMap<String, Deferrable>();
     private Set<String> columnNamesIsCascadeDelete = new HashSet<String>();
     private Set<String> columnNamesIsCascadeNullable = new HashSet<String>();
@@ -214,7 +213,7 @@ public class TableConfig {
 
     private void putTableAnnotation(Class annClass, Annotation annotation) {
         if (!COLLECT_ANNOTATIONS.contains(annotation.annotationType())) {
-            throw new IllegalArgumentException("not chosen to collect annotations of type " + annotation.getClass());
+            throw new IllegalArgumentException("disabled via config to collect annotations of type " + annotation.getClass());
         }
 
         annotations2annClassMap.put(annotation, annClass);
@@ -258,10 +257,6 @@ public class TableConfig {
         return columnNameToAccessibleObject;
     }
 
-    public Map<String, String> getColumnNameToEnumCheckConstraints() {
-        return columnNameToEnumCheckConstraints;
-    }
-
     public Map<String, Deferrable> getColumnNameToDeferrable() {
         return columnNameToDeferrable;
     }
@@ -298,32 +293,6 @@ public class TableConfig {
                 if (fOm.isAnnotationPresent(Embedded.class)) {
                     addAttributeOverrides(attr2colName, attrPathField, fOm);
                     gatherEnumCheckConstraints(attr2colName, attrPathField, attributeType);
-                }
-                else if (attributeType.isEnum()) {
-                    String colName = attr2colName.get(attrPathField);
-                    if (colName == null) {
-                        if (fOm.isAnnotationPresent(Column.class)) {
-                            colName = getIdentifierForReference(fOm.getAnnotation(Column.class).name());
-                        }
-
-                        if (StringUtils.isEmpty(colName)) {
-                            colName = getIdentifierForReference(attributeName);
-                        }
-                    }
-                    boolean useName = fOm.isAnnotationPresent(Enumerated.class) && fOm.getAnnotation(Enumerated.class).value() == EnumType.STRING;
-                    StringBuilder cons = new StringBuilder();
-                    for (Object e : attributeType.getEnumConstants()) {
-                        if (cons.length() > 0) {
-                            cons.append(", ");
-                        }
-                        if (useName) {
-                            cons.append("'").append(((Enum)e).name()).append("'");
-                        }
-                        else {
-                            cons.append(((Enum) e).ordinal());
-                        }
-                    }
-                    columnNameToEnumCheckConstraints.put(colName, cons.toString());
                 }
             }
         });

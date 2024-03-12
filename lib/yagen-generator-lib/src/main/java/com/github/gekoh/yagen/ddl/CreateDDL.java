@@ -136,7 +136,7 @@ public class CreateDDL {
     private static final String COL_PATTERN_IDX_CHECK_NAME  = "checkName";
     private static final Pattern COL_PATTERN = Pattern.compile("([\\(|\\s]?)(" + REGEX_COLNAME + ")([\\s]((varchar(2)?\\([^\\)]+\\))|(number\\([^\\)]+\\))|(numeric\\([^\\)]+\\))|(timestamp(\\s*\\([0-9]+\\))?)|(date)|([cb]lob)|(text)|(char\\([^\\)]+\\))|(int((eger)|[0-9]*))|(bigint)|(bit)|(bool(ean)?)|(((double)|(float[0-9]?(\\s*\\([0-9]+\\))?))( precision)?)))([\\s]+default[\\s]*([^\\s]*))?(([\\s]+constraint[\\s]+([a-zA-Z]+[0-9a-zA-Z_]*))?([\\s]+not)?[\\s]+null)?" +
             "(([\\s]+constraint[\\s]+([a-zA-Z]+[0-9a-zA-Z_]*))?[\\s]+unique)?" +
-            "(?<" + COL_PATTERN_IDX_CHECK + ">([\\s]+constraint[\\s]+(?<" + COL_PATTERN_IDX_CHECK_NAME + ">[a-zA-Z]+[0-9a-zA-Z_]*))?[\\s]+check[\\s]+\\(([^\\(]+\\([^\\)]+\\))*\\))?" +
+            "(?<" + COL_PATTERN_IDX_CHECK + ">([\\s]+constraint[\\s]+(?<" + COL_PATTERN_IDX_CHECK_NAME + ">[a-zA-Z]+[0-9a-zA-Z_]*))?[\\s]+check[\\s]+\\(([^\\()]+\\([^\\)]+\\))*\\))?" +
             "[^\\(,]*(,|\\))");
 
     private static final Pattern UNIQUE_PATTERN = Pattern.compile("(,(([\\s]*constraint[\\s]+([a-zA-Z]+[0-9a-zA-Z_]*))?[\\s]*unique[\\s]*\\((" + REGEX_COLNAME + "([\\s]*,[\\s]*" + REGEX_COLNAME + ")*)\\)))");
@@ -351,7 +351,7 @@ public class CreateDDL {
         String nameLC = name.toLowerCase();
 
         if (!renderTable(nameLC)) {
-            LOG.info("skipped dropping table '" + name + "' as the mapped entity was not chosen to be processed");
+            LOG.debug("skipped dropping table '{}' due to config", name);
             return "";
         }
 
@@ -413,7 +413,7 @@ public class CreateDDL {
         Set<String> columns = new LinkedHashSet<String>(columnMap.keySet());
 
         if (!renderTable(nameLC)) {
-            LOG.info("skipped creation statement for table '" + tableName + "' as the mapped entity was not chosen to be processed");
+            LOG.debug("skipped creation statement for table '{}' due to config", tableName);
             return "";
         }
 
@@ -422,12 +422,12 @@ public class CreateDDL {
         TableConfig tableConfig = tblNameToConfig.get(nameLC);
 
         if (tableConfig == null) {
-            LOG.warn("unable to locate table config for table {}, cannot enhance DDL", nameLC);
+            LOG.warn("unable to locate table config for table {}, cannot enhance DDL", tableName);
             return buf.toString();
         }
 
         if (externalViews.contains(nameLC)) {
-            LOG.info("skipped creation statement for table '" + tableName + "' since there will be a view in place");
+            LOG.info("skipped creation statement for table '{}' since there will be a view in place", tableName);
             return "";
         }
 
@@ -604,7 +604,7 @@ public class CreateDDL {
             sqlCreate = addPartitioning(buf, partitioning, nameLC, sqlCreate, columns, pkCols);
         }
 
-        sqlCreate = addConstraintsAndNames(dialect, buf, sqlCreate, nameLC, tableConfig.getColumnNameToEnumCheckConstraints());
+        sqlCreate = addConstraintsAndNames(dialect, buf, sqlCreate, nameLC);
         sqlCreate = addDefaultValues(dialect, sqlCreate, nameLC);
 
         Changelog changelog = tableConfig.getTableAnnotationOfType(Changelog.class);
@@ -927,7 +927,7 @@ public class CreateDDL {
         String tableNameLC = table.getName().toLowerCase();
 
         if (!renderTable(tableNameLC) || externalViews.contains(tableNameLC)) {
-            LOG.info("skipped creation of constraint '" + name + "' for table '" + table.getName() + "' as the mapped entity was not chosen to be processed or is a view");
+            LOG.debug("skipped creation of constraint '{}' for table '{}' due to config", name, table.getName());
             return "";
         }
 
@@ -1049,12 +1049,12 @@ public class CreateDDL {
 
         String tableNameLC = table.getName().toLowerCase();
         if (!renderTable(tableNameLC)) {
-            LOG.info("skipped creation of index '" + name + "' for table '" + tableNameLC + "' as the mapped entity was not chosen to be processed");
+            LOG.debug("skipped creation of index '{}' on table '{}' due to config", name, table.getName());
             return "";
         }
 
         if (externalViews.contains(tableNameLC)) {
-            LOG.info("skipped creation of index '" + name + "' on table '" + tableNameLC + "' since there is a view in place");
+            LOG.debug("skipped creation of index '{}' on table '{}' since there is a view in place", name, table.getName());
             return "";
         }
         TableConfig tableConfig = tblNameToConfig.get(tableNameLC);
@@ -1605,7 +1605,7 @@ public class CreateDDL {
         return comment.replaceAll("'", "''''").replaceAll("\n", "'||chr(10)||\n'");
     }
 
-    private String addConstraintsAndNames(Dialect dialect, StringBuffer additionalObjects, String sqlCreate, String nameLC, Map<String, String> column2EnumConstraint) {
+    private String addConstraintsAndNames(Dialect dialect, StringBuffer additionalObjects, String sqlCreate, String nameLC) {
         List<String> pkColumns = getPkColumnNamesFrom(sqlCreate);
         TableConfig tableConfig = tblNameToConfig.get(nameLC);
 
@@ -1618,18 +1618,14 @@ public class CreateDDL {
             String defColName = matcher.group(COL_PATTERN_IDX_COLNAME);
             String colName = TableConfig.getIdentifierForReference(defColName);
 
-            String constraintDef = column2EnumConstraint != null ? column2EnumConstraint.get(colName) : null;
-            if (constraintDef != null) {
-                String constraintName = getProfile().getNamingStrategy().constraintName(getEntityClassName(nameLC), nameLC, colName, Constants._CK);
-                enumConstraints.append(", constraint ").append(constraintName);
-                enumConstraints.append(" check (").append(defColName).append(" in (").append(constraintDef).append("))");
-            }
-
             // name not null constraint
             idx = appendConstraint(b, sqlCreate, nameLC, colName, idx, matcher, COL_PATTERN_IDX_NOTNULL, COL_PATTERN_IDX_NOTNULL_CONS_NAME, Constants._NN);
 
             // name unique constraint
             idx = appendConstraint(b, sqlCreate, nameLC, colName, idx, matcher, COL_PATTERN_IDX_UNIQUE, COL_PATTERN_IDX_UNIQUE_CONS_NAME, Constants._UK);
+
+            // check constraint
+            idx = appendConstraint(b, sqlCreate, nameLC, colName, idx, matcher, COL_PATTERN_IDX_CHECK, COL_PATTERN_IDX_CHECK_NAME, Constants._CK);
 
             b.append(sqlCreate.substring(idx, matcher.end()));
             idx = matcher.end();
@@ -1816,6 +1812,27 @@ public class CreateDDL {
                                  Matcher colMatcher,
                                  int groupId,
                                  int existingNameGroupId,
+                                 String constraintSuffix) {
+        if (colMatcher.group(groupId) != null && colMatcher.group(existingNameGroupId) == null) {
+            String constraintName = getProfile().getNamingStrategy().constraintName(getEntityClassName(tableName), tableName, columnName, constraintSuffix);
+            b.append(sqlCreate.substring(currIdx, colMatcher.start(groupId)));
+            currIdx = colMatcher.start(groupId);
+            b.append(" constraint ").append(constraintName);
+            b.append(sqlCreate.substring(currIdx, colMatcher.end(groupId)));
+            currIdx = colMatcher.end(groupId);
+        }
+
+        return currIdx;
+    }
+
+    private int appendConstraint(StringBuilder b,
+                                 String sqlCreate,
+                                 String tableName,
+                                 String columnName,
+                                 int currIdx,
+                                 Matcher colMatcher,
+                                 String groupId,
+                                 String existingNameGroupId,
                                  String constraintSuffix) {
         if (colMatcher.group(groupId) != null && colMatcher.group(existingNameGroupId) == null) {
             String constraintName = getProfile().getNamingStrategy().constraintName(getEntityClassName(tableName), tableName, columnName, constraintSuffix);
@@ -2360,7 +2377,7 @@ public class CreateDDL {
             sqlCreateString = sql.toString();
         }
 
-        sqlCreateString = addConstraintsAndNames(dialect, additionalObjects, sqlCreateString, histTableName.toLowerCase(), null);
+        sqlCreateString = addConstraintsAndNames(dialect, additionalObjects, sqlCreateString, histTableName.toLowerCase());
 //        not adding default values to history tables, this will make investigations very hard
 //        sqlCreateString = addDefaultValues(sqlCreateString, histTableName.toLowerCase());
 
