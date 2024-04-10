@@ -425,6 +425,10 @@ public class DBHelper {
         return null;
     }
 
+    public static String getTimestampDdlTypeDeclaration(Dialect dialect) {
+        return getDdlTypeDeclaration(dialect, Types.TIMESTAMP, 0, dialect.getDefaultTimestampPrecision(), 0);
+    }
+
     public static String getDdlTypeDeclaration(Dialect dialect, int type, int length, int intPrec, int intScale) {
         Metadata metadata = getMetadata(dialect);
         if (metadata != null) {

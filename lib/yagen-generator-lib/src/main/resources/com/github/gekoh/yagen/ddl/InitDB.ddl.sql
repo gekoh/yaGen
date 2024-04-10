@@ -84,13 +84,13 @@ begin atomic
 end;
 
 ------- CreateDDL statement separator -------
-CREATE FUNCTION f_sysdate() RETURNS timestamp(9)
+CREATE FUNCTION f_sysdate() RETURNS ${timestampType}
   LANGUAGE JAVA DETERMINISTIC NO SQL
   EXTERNAL NAME 'CLASSPATH:com.github.gekoh.yagen.util.DBHelper.getCurrentTimestamp'
 ;
 
 ------- CreateDDL statement separator -------
-CREATE FUNCTION systimestamp_9() RETURNS timestamp(9)
+CREATE FUNCTION systimestamp_9() RETURNS ${timestampType}
   LANGUAGE JAVA DETERMINISTIC NO SQL
   EXTERNAL NAME 'CLASSPATH:com.github.gekoh.yagen.util.DBHelper.getCurrentTimestamp'
 ;

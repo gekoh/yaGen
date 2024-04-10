@@ -619,7 +619,11 @@ public class CreateDDL {
 
             if (matcher.find()) {
                 sqlCreate = sqlCreate.substring(0, matcher.start(TBL_PATTERN_IDX_TBL_SYN)) + "global temporary " +
-                        sqlCreate.substring(matcher.start(TBL_PATTERN_IDX_TBL_SYN), matcher.end(TBL_PATTERN_IDX_TBL_DEF)+1) +
+                        sqlCreate.substring(matcher.start(TBL_PATTERN_IDX_TBL_SYN), matcher.end(TBL_PATTERN_IDX_TBL_SYN)) +
+            // adding clause IF NOT EXISTS for temporary tables in postgres since they are not persistent and have to be created in every transaction
+            // this will then prevent errors when executing repeatedly
+                        (isPostgres(dialect) ? " IF NOT EXISTS" : "") +
+                        sqlCreate.substring(matcher.end(TBL_PATTERN_IDX_TBL_SYN), matcher.end(TBL_PATTERN_IDX_TBL_DEF)+1) +
                         " ON COMMIT " + table.globalTemporaryOnCommit() + sqlCreate.substring(matcher.end(TBL_PATTERN_IDX_TBL_DEF)+1);
             }
         }
@@ -1196,6 +1200,7 @@ public class CreateDDL {
         context.put("is_hsql", isHsqlDb(dialect));
         context.put("is_oracleXE", isOracleXE(dialect));
         context.put("bypassFunctionality", DBHelper.implementBypassFunctionality(DBHelper.getMetadata(dialect)));
+        context.put("timestampType", DBHelper.getTimestampDdlTypeDeclaration(dialect));
 
         setNewOldVar(dialect, context);
         return context;
@@ -1251,7 +1256,7 @@ public class CreateDDL {
             StringBuilder sb = new StringBuilder(sqlCreate.substring(0, insertIdx));
             for (String auditColumn : auditColumns) {
                 if (!columns.contains(auditColumn)) {
-                    sb.append(", ").append(formatColumn(dialect, AUDIT_COLUMN_DEFINITION.get(auditColumn), userNameLength, null, null));
+                    sb.append(", ").append(formatColumn(dialect, AUDIT_COLUMN_DEFINITION.get(auditColumn), userNameLength));
                     columns.add(auditColumn);
                 }
             }
@@ -1261,13 +1266,10 @@ public class CreateDDL {
         return sqlCreate;
     }
 
-    private static String formatColumn(Dialect dialect, String colTemplate, Integer length, Integer precision, Integer scale) {
+    private static String formatColumn(Dialect dialect, String colTemplate, Integer length) {
         int intLen   = length != null ? length : 0;
-        int intPrec  = precision != null ? precision : 0;
-        int intScale = scale != null ? scale : 0;
 
         VelocityContext context = newVelocityContext(dialect);
-        context.put("timestampType", getTimestampDdlTypeDeclaration(dialect));
         context.put("varcharType", getVarcharDdlTypeDeclaration(dialect, intLen));
 
         StringWriter wr = new StringWriter();
@@ -2137,7 +2139,6 @@ public class CreateDDL {
         context.put("nonPkColumns", nonPkColumns);
         context.put("histRelevantCols", histRelevantCols);
         context.put("columnMap", columnMap);
-        context.put("timestampType", getTimestampDdlTypeDeclaration(dialect));
 
         StringWriter wr = new StringWriter();
 
@@ -2150,10 +2151,6 @@ public class CreateDDL {
         }
 
         return wr.toString();
-    }
-
-    private static String getTimestampDdlTypeDeclaration(Dialect dialect) {
-        return DBHelper.getDdlTypeDeclaration(dialect, Types.TIMESTAMP, 0, 9, 0);
     }
 
     private String getLatestSnapshotViewSql (Dialect dialect,
@@ -2185,7 +2182,6 @@ public class CreateDDL {
         context.put("nonPkColumns", nonPkColumns);
         context.put("histRelevantCols", histRelevantCols);
         context.put("columnMap", columnMap);
-        context.put("timestampType", getTimestampDdlTypeDeclaration(dialect));
 
         StringWriter objWr = new StringWriter();
 
@@ -2260,15 +2256,15 @@ public class CreateDDL {
 
             sql.append(sqlCreateString.substring(0, matcher.start(TBL_PATTERN_WO_PK_IDX_TBLNAME))).append(histTableName);
             sql.append(sqlCreateString.substring(matcher.end(TBL_PATTERN_WO_PK_IDX_TBLNAME), matcher.end(TBL_PATTERN_WO_PK_IDX_BEFORE_COL_DEF)));
-            sql.append(formatColumn(dialect, HIST_TABLE_PK_COLUMN_NAME+" ${varcharType} not null", Constants.UUID_LEN, null, null)).append(", ");
-            sql.append(formatColumn(dialect, HIST_OPERATION_COLUMN_NAME+" ${varcharType} not null", 1, null, null)).append(", ");
+            sql.append(formatColumn(dialect, HIST_TABLE_PK_COLUMN_NAME+" ${varcharType} not null", Constants.UUID_LEN)).append(", ");
+            sql.append(formatColumn(dialect, HIST_OPERATION_COLUMN_NAME+" ${varcharType} not null", 1)).append(", ");
 
             sql.append(sqlCreateString.substring(matcher.end(TBL_PATTERN_WO_PK_IDX_BEFORE_COL_DEF), endColsIdx));
 
             sql.append(", ");
 
             if (!columns.contains(histColName)) {
-                sql.append(formatColumn(dialect, histColName+" ${timestampType} not null", null, null, null)).append(", ");
+                sql.append(formatColumn(dialect, histColName+" ${timestampType} not null", null)).append(", ");
             }
 
             sql.append("primary key (");
@@ -2288,13 +2284,13 @@ public class CreateDDL {
 
             sql.append(sqlCreateString.substring(0, matcher.start(TBL_PATTERN_IDX_TBLNAME))).append(histTableName);
             sql.append(sqlCreateString.substring(matcher.end(TBL_PATTERN_IDX_TBLNAME), matcher.start(TBL_PATTERN_IDX_TBL_DEF)));
-            sql.append(formatColumn(dialect, HIST_TABLE_PK_COLUMN_NAME+" ${varcharType} not null", Constants.UUID_LEN, null, null)).append(", ");
-            sql.append(formatColumn(dialect, HIST_OPERATION_COLUMN_NAME+" ${varcharType} not null", 1, null, null)).append(", ");
+            sql.append(formatColumn(dialect, HIST_TABLE_PK_COLUMN_NAME+" ${varcharType} not null", Constants.UUID_LEN)).append(", ");
+            sql.append(formatColumn(dialect, HIST_OPERATION_COLUMN_NAME+" ${varcharType} not null", 1)).append(", ");
 
             sql.append(sqlCreateString.substring(matcher.start(TBL_PATTERN_IDX_TBL_DEF), matcher.start(TBL_PATTERN_IDX_PK_START)));
 
             if (!columns.contains(histColName)) {
-                sql.append(" ").append(formatColumn(dialect, histColName+" ${timestampType} not null", null, null, null)).append(",");
+                sql.append(" ").append(formatColumn(dialect, histColName+" ${timestampType} not null", null)).append(",");
             }
 
             String pkConstraintName = matcher.group(TBL_PATTERN_IDX_PK_NAME);

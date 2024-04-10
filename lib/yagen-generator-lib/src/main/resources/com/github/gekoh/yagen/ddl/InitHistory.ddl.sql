@@ -2,7 +2,7 @@
 ------- CreateDDL statement separator -------
 create global temporary table HST_CURRENT_TRANSACTION (
   transaction_id varchar2(4000 char),
-  transaction_timestamp timestamp,
+  transaction_timestamp ${timestampType},
   constraint hsttr_transaction_id_PK primary key (transaction_id)
 );
 
@@ -26,8 +26,8 @@ end;
 
 ------- CreateDDL statement separator -------
 create or replace function update_transaction_timestamp(exclude_hst_uuid_in in varchar2) return timestamp is
-  transaction_timestamp_found timestamp;
-  new_transaction_timestamp timestamp;
+  transaction_timestamp_found ${timestampType};
+  new_transaction_timestamp ${timestampType};
 begin
     select transaction_timestamp into transaction_timestamp_found
     from HST_CURRENT_TRANSACTION
@@ -58,7 +58,7 @@ end;
 ------- CreateDDL statement separator -------
 create global temporary table HST_CURRENT_TRANSACTION (
   transaction_id bigint,
-  transaction_timestamp timestamp,
+  transaction_timestamp ${timestampType},
   constraint hsttr_transaction_id_PK primary key (transaction_id)
 );
 
@@ -98,7 +98,7 @@ end;
 ------- CreateDDL statement separator -------
 create table HST_CURRENT_TRANSACTION (
     transaction_id bigint,
-    transaction_timestamp timestamp,
+    transaction_timestamp ${timestampType},
     constraint hsttr_transaction_id_PK primary key (transaction_id)
 );
 

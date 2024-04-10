@@ -24,7 +24,6 @@ import jakarta.persistence.EntityManagerFactory;
 import jakarta.persistence.MappedSuperclass;
 import jakarta.persistence.Persistence;
 import jakarta.persistence.metamodel.EntityType;
-import org.apache.velocity.VelocityContext;
 import org.apache.velocity.app.Velocity;
 import org.hibernate.boot.Metadata;
 import org.hibernate.boot.MetadataSources;
@@ -524,34 +523,11 @@ public class DDLGenerator {
         public String getDdlText(Dialect dialect) {
             if (text == null) {
                 String template = super.getDdlText(dialect);
-                // this ctx already contains is_* db flags derived from dialect
-                VelocityContext ctx = CreateDDL.newVelocityContext(dialect);
-
-                String driverClassName = DBHelper.getDriverClassName(dialect);
-                if (driverClassName != null && !"java.sql.Driver".equalsIgnoreCase(driverClassName)) {
-                    ctx.put("driverClassName", driverClassName);
-                    // re-apply is_* flags possibly based on driver classname
-                    validateSetDbFlagFromDialectAndDriver(ctx, "is_postgres", DBHelper.isPostgres(dialect), driverClassName, dialect);
-                    validateSetDbFlagFromDialectAndDriver(ctx, "is_oracle", DBHelper.isOracle(dialect), driverClassName, dialect);
-                    validateSetDbFlagFromDialectAndDriver(ctx,"is_hsql", DBHelper.isHsqlDb(dialect), driverClassName, dialect);
-                }
-
                 StringWriter wr = new StringWriter();
-                Velocity.evaluate(ctx, wr, url != null ? url.toString() : ddlText, template);
+                Velocity.evaluate(CreateDDL.newVelocityContext(dialect), wr, url != null ? url.toString() : ddlText, template);
                 text = wr.toString();
             }
             return text;
-        }
-
-        private void validateSetDbFlagFromDialectAndDriver(VelocityContext ctx, String ctxKey, boolean dbTypeFromDriverClassFlag, String driverClassName, Dialect dialect) {
-            Object ctxFlag = ctx.get(ctxKey);
-            if (ctxFlag instanceof Boolean) {
-                if (!ctxFlag.equals(dbTypeFromDriverClassFlag)) {
-                    throw new IllegalStateException("Error validating '"+ctxKey+"': driver class " + driverClassName + " leads to different DB type recognition than the given dialect: " + dialect);
-                }
-            } else {
-                ctx.put(ctxKey, dbTypeFromDriverClassFlag);
-            }
         }
     }
 }

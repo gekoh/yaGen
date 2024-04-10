@@ -11,7 +11,7 @@ declare
 #if($is_postgres)
   sql_rowcount integer;
 #end
-  transaction_timestamp_found timestamp;
+  transaction_timestamp_found ${timestampType};
   hst_operation HST_MODIFIED_ROW.operation%TYPE:=#if($is_postgres)substr(TG_OP, 1, 1)#{else}case when inserting then 'I'
                                                       when updating then 'U'
                                                       when deleting then 'D' end#{end};
