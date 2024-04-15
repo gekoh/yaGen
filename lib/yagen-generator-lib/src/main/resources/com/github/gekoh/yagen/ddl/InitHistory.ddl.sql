@@ -106,7 +106,7 @@ create table HST_CURRENT_TRANSACTION (
 create table HST_MODIFIED_ROW (
     transaction_id bigint,
     table_name varchar(30),
-    row_id tid,
+    row_id varchar(100),
     operation char(1),
     hst_table_name varchar(30),
     hst_uuid varchar(32),

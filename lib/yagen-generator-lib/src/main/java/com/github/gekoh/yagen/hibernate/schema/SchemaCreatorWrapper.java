@@ -149,7 +149,7 @@ public class SchemaCreatorWrapper implements SchemaCreator {
 
         @Override
         void doAccept(String command, String delimiter) {
-            delegate.accept(command + (delimiter != null ? delimiter : ""));
+            delegate.accept(prepareToPrint(command, delimiter));
         }
     }
     private static class GenerationTargetToScriptWrapper extends GenerationTargetWrapper {
@@ -160,7 +160,11 @@ public class SchemaCreatorWrapper implements SchemaCreator {
 
         @Override
         void doAccept(String command, String delimiter) {
-            delegate.accept(command + (delimiter != null ? delimiter : ""));
+            delegate.accept(prepareToPrint(command, delimiter));
         }
+    }
+
+    private static String prepareToPrint(String command, String delimiter) {
+        return command + (delimiter != null ? delimiter : "") + System.lineSeparator();
     }
 }

@@ -280,7 +280,7 @@ BEGIN
 
 #end
     if TG_OP = 'INSERT' then
-        new.created_at := localtimestamp;
+        new.created_at := clock_timestamp();
         new.created_by := get_audit_user(new.created_by);
         new.last_modified_at := null;
         new.last_modified_by := null;
@@ -290,7 +290,7 @@ BEGIN
         if not(new.last_modified_at is not null and (old.last_modified_at is null or new.last_modified_at <> old.last_modified_at )) then
           new.last_modified_by := get_audit_user(cast(user as varchar));
         end if;
-        new.last_modified_at := localtimestamp;
+        new.last_modified_at := clock_timestamp();
     end if;
     return new;
 END;
@@ -319,7 +319,7 @@ end if;
     if last_modified_by_colname is not null then
         new.last_modified_by := get_audit_user(new.last_modified_by);
     end if;
-    new.last_modified_at := localtimestamp;
+    new.last_modified_at := clock_timestamp();
 return new;
 END;
 $$ LANGUAGE 'plpgsql';

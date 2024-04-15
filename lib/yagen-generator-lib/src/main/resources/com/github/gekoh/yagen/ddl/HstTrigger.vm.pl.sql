@@ -16,7 +16,11 @@ declare
                                                       when updating then 'U'
                                                       when deleting then 'D' end#{end};
 #if( $is_postgres )
-  live_rowid tid:=case when hst_operation in ('U', 'I') then ${new}.ctid else ${old}.ctid end;
+  live_rowid varchar(100):=''
+    #foreach( $pkColumn in $pkColumns )
+        ||case when hst_operation in ('U', 'I') then ${new}.${pkColumn} else ${old}.${pkColumn} end
+    #end
+    ;
 #else
   live_rowid rowid:=coalesce(${new}.rowid, ${old}.rowid);
 #end
@@ -54,18 +58,11 @@ begin
         values (#if($is_postgres)txid_current()#{else}DBMS_TRANSACTION.LOCAL_TRANSACTION_ID#{end}, transaction_timestamp_found);
     end;
 
-#if( !$is_postgres )
+#if( $is_oracle )
     if ${new}.rowid<>${old}.rowid then
       update hst_modified_row set row_id=${new}.rowid
         where table_name=live_table_name
           and row_id=${old}.rowid;
-    end if;
-#else
-
-    if (hst_operation  = 'U') and ${new}.ctid <> ${old}.ctid then
-      update hst_modified_row set row_id=${new}.ctid
-        where transaction_id=txid_current() and table_name=live_table_name
-          and row_id=${old}.ctid;
     end if;
 #end
 
@@ -90,8 +87,7 @@ begin
 #if($is_postgres)
         GET DIAGNOSTICS sql_rowcount = ROW_COUNT;
         if sql_rowcount<>1 then
-          perform
-          raise_application_error(-20100, 'unable to invalidate history record for '||live_table_name
+          perform raise_application_error(-20100, 'unable to invalidate history record for '||live_table_name
 #foreach( $pkColumn in $pkColumns )
               ||' ${pkColumn}='''|| ${old}.${pkColumn} ||''''
 #end

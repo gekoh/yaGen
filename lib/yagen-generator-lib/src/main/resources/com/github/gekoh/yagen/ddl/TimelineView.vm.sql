@@ -139,8 +139,11 @@ select * from (
 where TML_PHASE<>'T'
 ;
 #else
-------- CreateDDL statement separator -------
+#if( $is_hsql )
 create or replace view CHANGELOG_ROW_V as
+#else
+create or replace view ${viewName} as
+#end
 with
 recursive changeset_tree (PRECURSOR_CHANGESET_UUID, UUID, CHANGESET_STATUS) AS (
     select PRECURSOR_CHANGESET_UUID, UUID, CHANGESET_STATUS
@@ -153,15 +156,23 @@ recursive changeset_tree (PRECURSOR_CHANGESET_UUID, UUID, CHANGESET_STATUS) AS (
         DSM_CHANGESET s
         join changeset_tree t on s.PRECURSOR_CHANGESET_UUID=t.UUID
 )
+#if(! $is_hsql )
+, CHANGELOG_ROW_V as (
+#end
 select l.*, #if( $is_postgres )row_number() over()#{else}rownum()#{end} as row_nr
 from
     dsm_changelog l
     join changeset_tree s on l.CHANGESET_UUID=s.uuid
+#if(! $is_hsql )
+),
+#else
 ;
 
 ------- CreateDDL statement separator -------
 create or replace view ${viewName}_base as
-with mut as (
+with
+#end
+mut as (
 	select
     l.row_nr,
     l.uuid CHANGELOG_UUID,
@@ -220,6 +231,9 @@ tml as (
   from
     mut m
 )
+#if(! $is_hsql )
+, ${viewName}_base as (
+#end
 	select distinct
         o_tml.TML_UUID,
         o_tml.TML_PHASE,
@@ -239,10 +253,14 @@ tml as (
             o_tml.EFFECTIVE_TIMESTAMP_FROM = (select max(EFFECTIVE_TIMESTAMP_FROM) from tml left join DSM_CHANGELOG cl on tml.TML_UUID=cl.UUID where tml.UUID=o_tml.UUID and cl.CHANGESET_UUID=o_cl.CHANGESET_UUID)
             and o_tml.ROW_NR = (select max(ROW_NR) from tml left join DSM_CHANGELOG cl on tml.TML_UUID=cl.UUID where tml.UUID=o_tml.UUID and cl.CHANGESET_UUID=o_cl.CHANGESET_UUID and o_tml.EFFECTIVE_TIMESTAMP_FROM=tml.EFFECTIVE_TIMESTAMP_FROM)
         )
+#if(! $is_hsql )
+)
+#else
 ;
 
 ------- CreateDDL statement separator -------
 create or replace view ${viewName} as
+#end
 select
   TML_UUID,
   TML_PHASE,
