@@ -42,7 +42,7 @@ public class YagenServiceContributor implements ServiceContributor {
                 }
                 else if (cos == null) {
                     map.put(COLUMN_ORDERING_STRATEGY, COLUMN_ORDERING_STRATEGY_REQUIRED_VALUE);
-                    LOG.info("{} set to {}, this may be required by timeline views (@Changelog) which rely on primary key order", COLUMN_ORDERING_STRATEGY, cos);
+                    LOG.info("setting property {}={}, this may be required by timeline views (@Changelog) which rely on primary key order", COLUMN_ORDERING_STRATEGY, COLUMN_ORDERING_STRATEGY_REQUIRED_VALUE);
                 }
 
                 return new ConfigurationServiceImpl(map);

@@ -40,6 +40,7 @@ import com.github.gekoh.yagen.util.FieldInfo;
 import jakarta.persistence.CollectionTable;
 import jakarta.persistence.DiscriminatorValue;
 import jakarta.persistence.JoinTable;
+import jakarta.persistence.Lob;
 import jakarta.persistence.MappedSuperclass;
 import org.apache.commons.lang.StringUtils;
 import org.apache.velocity.VelocityContext;
@@ -1307,25 +1308,22 @@ public class CreateDDL {
         context.put("numericColumns", numericColumnDefinitions.keySet());
         context.put("numericColumnDefinitions", numericColumnDefinitions);
         context.put("timestampColumns", timestampColumnDefinitions.keySet());
-        context.put("clobColumns", findClobColumns(sqlCreate));
+        context.put("clobColumns", findClobColumns(tableConfig));
 
         mergeTemplateFromResource("TimelineView.vm.sql", objWr, context);
 
         return objWr.toString();
     }
 
-    private Object findClobColumns(String sqlCreate) {
+    private Object findClobColumns(TableConfig tblConfig) {
         Set<String> lobColumns = new HashSet<String>();
-        Matcher colMatcher = COL_PATTERN.matcher(sqlCreate);
-        int idx = 0;
-
-        while (colMatcher.find(idx)) {
-            String type = colMatcher.group(COL_PATTERN_IDX_TYPE);
-            if (type.toLowerCase().contains("lob") || type.toLowerCase().contains("text") || type.toLowerCase().contains("longvarchar")) {
-                lobColumns.add(colMatcher.group(COL_PATTERN_IDX_COLNAME).toLowerCase());
-            }
-            idx = colMatcher.end();
-        }
+        do {
+            tblConfig.getColumnNameToAccessibleObject().forEach((key, value) -> {
+                if (value.isAnnotationPresent(Lob.class)) {
+                    lobColumns.add(key);
+                }
+            });
+        } while ((tblConfig = tblConfig.getSuperClassConfig()) != null);
         return lobColumns;
     }
 

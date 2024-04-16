@@ -34,6 +34,7 @@ import jakarta.persistence.OneToOne;
 import jakarta.persistence.PrimaryKeyJoinColumn;
 import jakarta.persistence.Transient;
 import org.apache.commons.lang.StringUtils;
+import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.Type;
 
 import java.lang.annotation.Annotation;
@@ -58,6 +59,8 @@ public class FieldInfo {
     private static Pattern STRING_ATTR_PATTERN = Pattern.compile("[\\(|\\s*](?<att>(name|columnDefinition|type)=)(?<quot>\"?(?<val>[^\\s\"]*)\"?)[,\\)]");
     private static Pattern INSERTABLE_PATTERN = Pattern.compile("[\\(,]\\s*(insertable\\s*=\\s*(true|false))\\s*[,\\)]");
     private static Pattern UPDATABLE_PATTERN = Pattern.compile("[\\(,]\\s*(updatable\\s*=\\s*(true|false))\\s*[,\\)]");
+
+    private static final String ANNOTATION_SEPARATOR = "\n    ";
 
     private Class type;
     private String name;
@@ -91,11 +94,14 @@ public class FieldInfo {
         isEmbedded = true;
     }
 
-    public FieldInfo(Class type, String name, boolean anEnum, Column column, boolean anLob) {
+    public FieldInfo(Class type, String name, boolean anEnum, Column column, boolean anLob, JdbcTypeCode jdbcTypeCode) {
         this(type, name, formatAnnotation(column));
         this.columnName = MappingUtils.deriveColumnName(column, name).toLowerCase();
         isEnum = anEnum;
         isLob = anLob;
+        if (isLob && jdbcTypeCode != null) {
+            addAnnotation(jdbcTypeCode);
+        }
     }
 
     public FieldInfo(Class type, String name, String columnName, int columnLength, JoinColumn joinColumn) {
@@ -154,7 +160,7 @@ public class FieldInfo {
     }
 
     public void addAnnotation(Annotation annotation) {
-        columnAnnotation = (columnAnnotation != null ? columnAnnotation+"\n    " : "" ) + formatAnnotation(annotation);
+        columnAnnotation = (columnAnnotation != null ? columnAnnotation+ ANNOTATION_SEPARATOR : "" ) + formatAnnotation(annotation);
     }
 
     public Field getField() {
@@ -426,7 +432,7 @@ public class FieldInfo {
                     fi = new FieldInfo(type, name, field.getAnnotation(AttributeOverrides.class));
                 }
             } else if (field.isAnnotationPresent(Enumerated.class)) {
-                fi = new FieldInfo(type, name, true, column, false);
+                fi = new FieldInfo(type, name, true, column, false, null);
             } else if (column != null && !field.isAnnotationPresent(CollectionTable.class)) {
                 if (type.isPrimitive()) {
                     if (type.equals(Boolean.TYPE)) {
@@ -447,7 +453,7 @@ public class FieldInfo {
                         type = Character.class;
                     }
                 }
-                fi = new FieldInfo(type, name, false, column, field.isAnnotationPresent(Lob.class));
+                fi = new FieldInfo(type, name, false, column, field.isAnnotationPresent(Lob.class), field.getAnnotation(JdbcTypeCode.class));
             } else if ((field.isAnnotationPresent(ManyToOne.class) && !field.isAnnotationPresent(JoinTable.class)) ||
                     (field.isAnnotationPresent(OneToOne.class) && StringUtils.isEmpty(field.getAnnotation(OneToOne.class).mappedBy()))) {
                 fi = getIdFieldInfo(type, name, MappingUtils.deriveColumnName(field));
