@@ -132,7 +132,9 @@ $$ LANGUAGE 'plpgsql';
   temporary tables available in postgresql.
   So on commit we remove the inserted rows via trigger function HST_CURRENT_TRANSACTION_TRG_FCT.
  */
-create or replace constraint trigger HST_CURRENT_TRANSACTION_TRG after insert
+drop trigger if exists HST_CURRENT_TRANSACTION_TRG on HST_CURRENT_TRANSACTION;
+
+create constraint trigger HST_CURRENT_TRANSACTION_TRG after insert
 on HST_CURRENT_TRANSACTION initially deferred for each row
 execute procedure HST_CURRENT_TRANSACTION_TRG_FCT();
 
