@@ -61,6 +61,8 @@ public class DBHelper {
     public static final String PROPERTY_BYPASS_REGEX = "yagen.bypass.regex";
     public static final String PROPERTY_SKIP_MODIFICATION = "yagen.skip-modification.regex";
 
+    public static final String PROPERTY_POSTGRES_USE_UUID_OSSP_EXTENSION = "yagen.generator.postgres.extension.uuid-ossp";
+
     private static Field FIELD_CONFIGURATION_VALUES;
     static {
         try {

@@ -158,48 +158,51 @@ end;
 #if( $is_postgres )
 
 ------- CreateDDL statement separator -------
-create temporary table SESSION_VARIABLES (
+create temporary table if not exists SESSION_VARIABLES (
     NAME VARCHAR(255),
     VALUE VARCHAR(255),
     constraint SESS_VAR_PK primary key (NAME)
 ) ON COMMIT PRESERVE ROWS;
 
+#set( $uuidExtension = $configuration['yagen.generator.postgres.extension.uuid-ossp'] )
+#if( $uuidExtension == 'create' )
 ------- CreateDDL statement separator -------
 CREATE EXTENSION "uuid-ossp";
 
+#end
 ------- CreateDDL statement separator -------
-CREATE FUNCTION sys_guid() RETURNS VARCHAR AS $$
+CREATE or replace FUNCTION sys_guid() RETURNS VARCHAR AS $$
 declare
 	guid varchar;
 begin
-    SELECT upper(REPLACE(uuid_generate_v4()::varchar, '-', '')) into guid;
+    SELECT upper(REPLACE(#if( $uuidExtension == 'create' )uuid_generate_v4()#{else}gen_random_uuid()#end::varchar, '-', '')) into guid;
     return guid;
 end;
 $$ LANGUAGE PLPGSQL;
 
 ------- CreateDDL statement separator -------
-CREATE FUNCTION systimestamp() RETURNS timestamp AS $$
+CREATE or replace FUNCTION systimestamp() RETURNS timestamp AS $$
 begin
     return clock_timestamp();
 end;
 $$ LANGUAGE PLPGSQL;
 
 ------- CreateDDL statement separator -------
-CREATE FUNCTION f_sysdate() RETURNS timestamp AS $$
+CREATE or replace FUNCTION f_sysdate() RETURNS timestamp AS $$
 begin
 return clock_timestamp();
 end;
 $$ LANGUAGE PLPGSQL;
 
 ------- CreateDDL statement separator -------
-CREATE FUNCTION raise_application_error(code int, message varchar) RETURNS void AS $$
+CREATE or replace FUNCTION raise_application_error(code int, message varchar) RETURNS void AS $$
 begin
     raise exception '%: %', code, message using errcode = abs(code)::varchar;
 end;
 $$ LANGUAGE PLPGSQL;
 
 ------- CreateDDL statement separator -------
-CREATE FUNCTION sys_context(namespace varchar,parameter varchar) RETURNS VARCHAR AS $$
+CREATE or replace FUNCTION sys_context(namespace varchar,parameter varchar) RETURNS VARCHAR AS $$
 DECLARE
   override_user varchar;
 begin
@@ -222,7 +225,7 @@ end;
 $$ LANGUAGE PLPGSQL;
 
 ------- CreateDDL statement separator -------
-create function get_audit_user(client_user_in in VARCHAR) RETURNS VARCHAR AS $$
+create or replace function get_audit_user(client_user_in in VARCHAR) RETURNS VARCHAR AS $$
 declare
   user_name varchar := substr(client_user_in, 1, 50);
 begin
@@ -240,14 +243,14 @@ $$ LANGUAGE PLPGSQL;
 #if( $bypassFunctionality )
 
 ------- CreateDDL statement separator -------
-CREATE FUNCTION is_bypassed(object_name varchar) RETURNS NUMERIC AS $$
+CREATE or replace FUNCTION is_bypassed(object_name varchar) RETURNS NUMERIC AS $$
 declare bypass_regex varchar(255);
 begin
   select value into bypass_regex
   from SESSION_VARIABLES
   where name='yagen.bypass.regex';
 
-  if REGEXP_MATCHES(object_name, bypass_regex) is not null then
+  if object_name ~ bypass_regex then
     return 1;
   end if;
   return 0;
@@ -258,19 +261,19 @@ $$ LANGUAGE PLPGSQL;
 #end
 
 ------- CreateDDL statement separator -------
-CREATE VIEW dual AS
+CREATE or replace VIEW dual AS
   select cast('X' as varchar) DUMMY
 ;
 
 ------- CreateDDL statement separator -------
-CREATE FUNCTION ora_hash(text_in in VARCHAR) RETURNS NUMERIC AS $$
+CREATE or replace FUNCTION ora_hash(text_in in VARCHAR) RETURNS NUMERIC AS $$
 BEGIN
 return hashtext(text_in);
 END;
 $$ LANGUAGE 'plpgsql';
 
 ------- CreateDDL statement separator -------
-CREATE FUNCTION audit_trigger_function()
+CREATE or replace FUNCTION audit_trigger_function()
   RETURNS trigger AS $$
 BEGIN
 #if( $bypassFunctionality )
@@ -297,7 +300,7 @@ END;
 $$ LANGUAGE 'plpgsql';
 
 ------- CreateDDL statement separator -------
-CREATE FUNCTION audit_trigger_function_single()
+CREATE or replace FUNCTION audit_trigger_function_single()
     RETURNS trigger AS $$
 declare
   last_modified_at_colname varchar;
@@ -325,7 +328,7 @@ END;
 $$ LANGUAGE 'plpgsql';
 
 ------- CreateDDL statement separator -------
-CREATE FUNCTION set_session_variable(var_name varchar, var_value varchar) RETURNS void AS $$
+CREATE or replace FUNCTION set_session_variable(var_name varchar, var_value varchar) RETURNS void AS $$
 declare
     affected_rows integer;
 begin
@@ -356,7 +359,7 @@ end;
 $$ LANGUAGE PLPGSQL;
 
 ------- CreateDDL statement separator -------
-CREATE FUNCTION remove_session_variable(var_name varchar) RETURNS void AS $$
+CREATE or replace FUNCTION remove_session_variable(var_name varchar) RETURNS void AS $$
 begin
     delete from SESSION_VARIABLES
         where name = var_name;
@@ -365,7 +368,7 @@ end;
 $$ LANGUAGE PLPGSQL;
 
 ------- CreateDDL statement separator -------
-CREATE FUNCTION get_session_variable(var_name varchar) RETURNS varchar AS $$
+CREATE or replace FUNCTION get_session_variable(var_name varchar) RETURNS varchar AS $$
 DECLARE
     ret varchar;
 begin

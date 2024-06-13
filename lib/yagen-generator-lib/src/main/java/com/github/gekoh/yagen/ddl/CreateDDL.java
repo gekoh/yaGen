@@ -45,6 +45,7 @@ import jakarta.persistence.MappedSuperclass;
 import org.apache.commons.lang.StringUtils;
 import org.apache.velocity.VelocityContext;
 import org.apache.velocity.app.Velocity;
+import org.hibernate.boot.Metadata;
 import org.hibernate.dialect.Dialect;
 import org.hibernate.mapping.Column;
 import org.hibernate.mapping.Constraint;
@@ -1200,8 +1201,13 @@ public class CreateDDL {
         context.put("is_postgres", isPostgres(dialect));
         context.put("is_hsql", isHsqlDb(dialect));
         context.put("is_oracleXE", isOracleXE(dialect));
-        context.put("bypassFunctionality", DBHelper.implementBypassFunctionality(DBHelper.getMetadata(dialect)));
         context.put("timestampType", DBHelper.getTimestampDdlTypeDeclaration(dialect));
+
+        Metadata metadata = DBHelper.getMetadata(dialect);
+        if (metadata != null) {
+            context.put("configuration", DBHelper.getConfigurationValues(metadata));
+            context.put("bypassFunctionality", DBHelper.implementBypassFunctionality(metadata));
+        }
 
         setNewOldVar(dialect, context);
         return context;

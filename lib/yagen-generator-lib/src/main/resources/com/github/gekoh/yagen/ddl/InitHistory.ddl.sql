@@ -96,14 +96,14 @@ end;
 
 #if( $is_postgres )
 ------- CreateDDL statement separator -------
-create table HST_CURRENT_TRANSACTION (
+create table if not exists HST_CURRENT_TRANSACTION (
     transaction_id bigint,
     transaction_timestamp ${timestampType},
     constraint hsttr_transaction_id_PK primary key (transaction_id)
 );
 
 ------- CreateDDL statement separator -------
-create table HST_MODIFIED_ROW (
+create table if not exists HST_MODIFIED_ROW (
     transaction_id bigint,
     table_name varchar(30),
     row_id varchar(100),
@@ -114,7 +114,7 @@ create table HST_MODIFIED_ROW (
 );
 
 ------- CreateDDL statement separator -------
-create index hstmod_rowid_tablename_IX on HST_MODIFIED_ROW (row_id, table_name);
+create index if not exists hstmod_rowid_tablename_IX on HST_MODIFIED_ROW (row_id, table_name);
 
 ------- CreateDDL statement separator -------
 CREATE or REPLACE FUNCTION HST_CURRENT_TRANSACTION_TRG_FCT()
@@ -132,12 +132,12 @@ $$ LANGUAGE 'plpgsql';
   temporary tables available in postgresql.
   So on commit we remove the inserted rows via trigger function HST_CURRENT_TRANSACTION_TRG_FCT.
  */
-create constraint trigger HST_CURRENT_TRANSACTION_TRG after insert
+create or replace constraint trigger HST_CURRENT_TRANSACTION_TRG after insert
 on HST_CURRENT_TRANSACTION initially deferred for each row
 execute procedure HST_CURRENT_TRANSACTION_TRG_FCT();
 
 ------- CreateDDL statement separator -------
-create function set_transaction_timestamp(timestamp_in timestamp) RETURNS void AS $$
+create or replace function set_transaction_timestamp(timestamp_in timestamp) RETURNS void AS $$
 declare
   transaction_id_used bigint;
 begin

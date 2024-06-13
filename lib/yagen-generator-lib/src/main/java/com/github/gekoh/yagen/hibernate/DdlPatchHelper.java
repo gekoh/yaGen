@@ -57,7 +57,18 @@ public class DdlPatchHelper {
     }
 
     public static void initDialect(Metadata metadata) {
-        initDialect(DDLGenerator.createProfileFromMetadata("runtime", metadata), metadata);
+        Dialect dialect = metadata.getDatabase().getDialect();
+        DDLEnhancerAware ea = unwrap(dialect);
+
+        DDLGenerator.Profile profile;
+
+        if (ea == null || ea.getDDLEnhancer() == null || ea.getDDLEnhancer().getProfile() == null) {
+            profile = DDLGenerator.createProfileFromMetadata("runtime", metadata);
+        }
+        else {
+            profile = ea.getDDLEnhancer().getProfile();
+        }
+        initDialect(profile, metadata);
     }
 
     public static void initDialect(DDLGenerator.Profile profile, Metadata metadata) {

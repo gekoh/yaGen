@@ -6,6 +6,7 @@ import org.junit.Assert;
 import org.junit.Test;
 
 import java.util.Collection;
+import java.util.regex.Pattern;
 
 /**
  * @author Georg Kohlweiss
@@ -81,11 +82,8 @@ public class CreateDDLTest {
     }
 
     private void assertHtrUpdateInvalidatedAtSql(String lowerCase) {
-        Assert.assertTrue(lowerCase.contains("update amp_job_configs_hst h set invalidated_at=transaction_timestamp_found\n" +
-                                              "          where\n" +
-                                              "            transaction_timestamp < transaction_timestamp_found and\n" +
-                                              "            operation <> 'd' and\n" +
-                                              "            id=:old.id and\n" +
-                                              "            invalidated_at is null;"));
+        lowerCase = Pattern.compile("\\s\\s*", Pattern.MULTILINE | Pattern.DOTALL).matcher(lowerCase).replaceAll(" ");
+
+        Assert.assertTrue(lowerCase.contains("update amp_job_configs_hst h set invalidated_at=transaction_timestamp_found where transaction_timestamp < transaction_timestamp_found and operation <> 'd' and id=:old.id and invalidated_at is null;"));
     }
 }

@@ -31,6 +31,7 @@
             <property name="yagen.generator.bypass.implement" value="true"/>
             <property name="yagen.generator.profile.providerClass" value="com.github.gekoh.yagen.example.ddl.ExampleProfileProvider"/>
             <property name="hibernate.schema_management_tool" value="com.github.gekoh.yagen.hibernate.schema.SchemaManagementToolWrapper"/>
+            <property name="yagen.generator.postgres.extension.uuid-ossp" value="create"/>
         </properties>
 
     </persistence-unit>
