@@ -10,7 +10,7 @@ begin
   user_name:=substr(regexp_replace(regexp_replace(coalesce(user_name, sys_context('USERENV','CLIENT_IDENTIFIER'), sys_context('USERENV','OS_USER')),
              '^(.*)@.*$', '\1'),
              '^.*CN=([^, ]*).*$', '\1'),
-    1, 20);
+    1, 35 /*user column length*/ -3 -length(user));
   return user || case when user_name is not null and lower(user) <> lower(user_name) then ' ('||user_name||')' else '' end;
 end;
 /
@@ -150,7 +150,7 @@ begin atomic
   set user_name = substr(regexp_replace(regexp_replace(coalesce(user_name, sys_context('USERENV','CLIENT_IDENTIFIER'), sys_context('USERENV','OS_USER')),
     '^(.*)@.*$', '\1'),
     '^.*CN=([^, ]*).*$', '\1'),
-    1, 20);
+    1, 35 /*user column length*/ -3 -length(user));
   return user || case when user_name is not null and lower(user) <> lower(user_name) then ' ('||user_name||')' else '' end;
 end;
 #end
@@ -235,7 +235,7 @@ begin
   user_name:=substr(regexp_replace(regexp_replace(coalesce(user_name, sys_context('USERENV','CLIENT_IDENTIFIER'), sys_context('USERENV','OS_USER')),
              '^(.*)@.*$', '\1'),
              '^.*CN=([^, ]*).*$', '\1'),
-    1, 20);
+    1, 35 /*user column length*/ -3 -length(user));
   return user || case when user_name is not null and lower(user) <> lower(user_name) then ' ('||user_name||')' else '' end;
 end;
 $$ LANGUAGE PLPGSQL;

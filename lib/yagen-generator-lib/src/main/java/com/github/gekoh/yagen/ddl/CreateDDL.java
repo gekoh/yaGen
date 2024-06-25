@@ -46,6 +46,7 @@ import org.apache.commons.lang.StringUtils;
 import org.apache.velocity.VelocityContext;
 import org.apache.velocity.app.Velocity;
 import org.hibernate.boot.Metadata;
+import org.hibernate.boot.model.naming.Identifier;
 import org.hibernate.dialect.Dialect;
 import org.hibernate.mapping.Column;
 import org.hibernate.mapping.Constraint;
@@ -465,7 +466,7 @@ public class CreateDDL {
                         .append(nameLC).append("'\n");
             }
 
-            deferredDdl.append(STATEMENT_SEPARATOR).append(getI18NDetailViewCreateString(dialect, nameLC, baseEntityTableName, i18nTblName, i18nFK, columnNames));
+            deferredDdl.append(STATEMENT_SEPARATOR).append(getI18NDetailViewCreateString(dialect, nameLC, baseEntityTableName, i18nTblName, i18nFK, columnNames, tableConfig));
             if (isOracle) {
                 addComments(deferredDdl, nameLC, entityClassName, columns);
             }
@@ -1969,7 +1970,7 @@ public class CreateDDL {
         return sql.toString();
     }
     
-    private String getI18NDetailViewCreateString (Dialect dialect, String i18nDetailTblName, String baseEntityTableName, String i18nTblName, String i18nFKColName, Set<String> columns) {
+    private String getI18NDetailViewCreateString (Dialect dialect, String i18nDetailTblName, String baseEntityTableName, String i18nTblName, String i18nFKColName, Set<String> columns, TableConfig tableConfig) {
         VelocityContext context = newVelocityContext(dialect);
         context.put("i18nDetailTblName", i18nDetailTblName);
         context.put("i18nTblName", i18nTblName);
@@ -1977,6 +1978,7 @@ public class CreateDDL {
         context.put("i18nFKColName", i18nFKColName);
         context.put("columns", new ArrayList(columns));
         context.put("baseEntityPKColNames", tblNameToConfig.get(baseEntityTableName).getPkColnames());
+        context.put("columnMapping_IS_PERSISTENT", getProfile().getMetadata().getEntityBinding(tableConfig.getEntityBaseClassName()).getTable().getColumn(Identifier.toIdentifier(I18N_COLUMN_IS_PERSISTENT)));
 
         context.put("I18N_COLUMN_COMPOSITE_ID", I18N_COLUMN_COMPOSITE_ID);
         context.put("I18N_COLUMN_IS_PERSISTENT", I18N_COLUMN_IS_PERSISTENT);

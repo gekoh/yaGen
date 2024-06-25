@@ -3,7 +3,7 @@
 create or replace view $i18nDetailTblName as
 select
   x.${i18nFKColName}||'-'||x.language_cd AS ${I18N_COLUMN_COMPOSITE_ID},
-  case when i18n.${i18nFKColName} is not null then 'Y' else 'N' end AS ${I18N_COLUMN_IS_PERSISTENT}#foreach( $column in $columns ),
+  case when i18n.${i18nFKColName} is not null then #if( $columnMapping_IS_PERSISTENT.sqlType.contains("int") || $columnMapping_IS_PERSISTENT.sqlType.contains("num") )1 else 0#{else}'Y' else 'N'#end end AS ${I18N_COLUMN_IS_PERSISTENT}#foreach( $column in $columns ),
 #if( $column == 'description' )
   case when i18n.${i18nFKColName} is not null then i18n.description else (
       select description
