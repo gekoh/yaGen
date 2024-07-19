@@ -1159,6 +1159,7 @@ public class CreateDDL {
     private void createCascadeNullableTrigger(Dialect dialect, StringBuffer buf, String tableName, String colName) {
         if (isOracle(dialect)) {
             createCascadeNullableTrigger(dialect, buf, tableName, colName, "CascadeNullableTrigger.vm.pl.sql", null);
+            buf.append("\n/");
         }
         else if (isPostgres(dialect)) {
             String triggerName = createCascadeNullableTrigger(dialect, buf, tableName, colName, "CascadeNullableTrigger.vm.pl.sql", null);
@@ -1171,7 +1172,9 @@ public class CreateDDL {
         }
         else if (isHsqlDb(dialect)) {
             createCascadeNullableTrigger(dialect, buf, tableName, colName, "hsqldb/CascadeNullableTrigger.vm.pl.sql", "I");
+            buf.append("\n/");
             createCascadeNullableTrigger(dialect, buf, tableName, colName, "hsqldb/CascadeNullableTrigger.vm.pl.sql", "U");
+            buf.append("\n/");
         }
     }
 
@@ -1190,7 +1193,7 @@ public class CreateDDL {
 
         getProfile().duplex(ObjectType.TRIGGER, triggerName, wr.toString());
 
-        buf.append(STATEMENT_SEPARATOR).append(wr.toString()).append("\n/");
+        buf.append(STATEMENT_SEPARATOR).append(wr.toString());
 
         return triggerName;
     }
