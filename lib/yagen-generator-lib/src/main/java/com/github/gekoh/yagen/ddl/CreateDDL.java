@@ -542,7 +542,7 @@ public class CreateDDL {
                 }
                 else if (isPostgres(dialect)) {
                     buf.append(STATEMENT_SEPARATOR)
-                            .append(getPostgreSQLHistTriggerFunction(dialect, liveTableName, histTableName, histColNameLC, columnNames, pkCols, historyRelevantCols, blobCols, columnMap)).append("\n/");
+                            .append(getPostgreSQLHistTriggerFunction(dialect, liveTableName, histTableName, histColNameLC, columnNames, pkCols, historyRelevantCols, blobCols, columnMap));
 
                     buf.append(STATEMENT_SEPARATOR)
                             .append("create trigger ").append(liveTableName).append("_htU\n")
