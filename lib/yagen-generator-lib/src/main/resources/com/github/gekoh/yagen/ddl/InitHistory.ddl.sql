@@ -117,26 +117,38 @@ create table if not exists HST_MODIFIED_ROW (
 create index if not exists hstmod_rowid_tablename_IX on HST_MODIFIED_ROW (row_id, table_name);
 
 ------- CreateDDL statement separator -------
-CREATE or REPLACE FUNCTION HST_CURRENT_TRANSACTION_TRG_FCT()
-  RETURNS trigger AS $$
+do $_$
 begin
-  delete from HST_CURRENT_TRANSACTION where transaction_id=new.transaction_id;
-  delete from HST_MODIFIED_ROW where transaction_id=new.transaction_id;
-  return old;
-end;
-$$ LANGUAGE 'plpgsql';
+    CREATE FUNCTION HST_CURRENT_TRANSACTION_TRG_FCT()
+      RETURNS trigger AS $$
+    begin
+      delete from HST_CURRENT_TRANSACTION where transaction_id=new.transaction_id;
+      delete from HST_MODIFIED_ROW where transaction_id=new.transaction_id;
+      return old;
+    end;
+    $$ LANGUAGE 'plpgsql';
+exception
+    when duplicate_function then null;
+end; $_$;
 
 ------- CreateDDL statement separator -------
 /*
   This simulates the behaviour of global temporary tables since there is only
   temporary tables available in postgresql.
   So on commit we remove the inserted rows via trigger function HST_CURRENT_TRANSACTION_TRG_FCT.
- */
-drop trigger if exists HST_CURRENT_TRANSACTION_TRG on HST_CURRENT_TRANSACTION;
 
-create constraint trigger HST_CURRENT_TRANSACTION_TRG after insert
-on HST_CURRENT_TRANSACTION initially deferred for each row
-execute procedure HST_CURRENT_TRANSACTION_TRG_FCT();
+  Only create trigger if not existing, otherwise we get a weird error if trigger is removed and recreated
+  in one transaction when data has already been inserted [ERROR: could not find trigger 257927] -> random id of trigger
+ */
+
+do $_$
+begin
+    create constraint trigger HST_CURRENT_TRANSACTION_TRG after insert
+    on HST_CURRENT_TRANSACTION initially deferred for each row
+    execute procedure HST_CURRENT_TRANSACTION_TRG_FCT();
+exception
+    when duplicate_object then null;
+end; $_$;
 
 ------- CreateDDL statement separator -------
 create or replace function set_transaction_timestamp(timestamp_in timestamp) RETURNS void AS $$
