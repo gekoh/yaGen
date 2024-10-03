@@ -1,6 +1,8 @@
 package com.github.gekoh.yagen.hibernate.schema;
 
 import com.github.gekoh.yagen.hibernate.DdlPatchHelper;
+import com.github.gekoh.yagen.hibernate.DdlPostProcessor;
+import com.github.gekoh.yagen.util.DBHelper;
 import org.hibernate.boot.Metadata;
 import org.hibernate.dialect.Dialect;
 import org.hibernate.resource.transaction.spi.DdlTransactionIsolator;
@@ -22,6 +24,7 @@ import org.hibernate.tool.schema.spi.SourceDescriptor;
 import org.hibernate.tool.schema.spi.TargetDescriptor;
 
 import java.util.Collection;
+import java.util.Map;
 
 public class SchemaCreatorWrapper implements SchemaCreator {
 
@@ -82,11 +85,22 @@ public class SchemaCreatorWrapper implements SchemaCreator {
         protected final GenerationTarget delegate;
         private final ExecutionOptions options;
         private final Dialect dialect;
+        private final DdlPostProcessor postProcessor;
 
         public GenerationTargetWrapper(GenerationTarget delegate, ExecutionOptions options, Dialect dialect) {
             this.delegate = delegate;
             this.options = options;
             this.dialect = dialect;
+            DdlPostProcessor finalPostProcessor = null;
+            Map configurationValues = DBHelper.getConfigurationValues(DBHelper.getMetadata(dialect));
+            if (configurationValues != null && configurationValues.containsKey(DBHelper.PROPERTY_POST_PROCESSOR_CLASS)) {
+                try {
+                    finalPostProcessor = (DdlPostProcessor) Class.forName((String) configurationValues.get(DBHelper.PROPERTY_POST_PROCESSOR_CLASS)).getConstructors()[0].newInstance();
+                } catch (Exception e) {
+                    throw new IllegalStateException(e);
+                }
+            }
+            postProcessor = finalPostProcessor;
         }
 
         @Override
@@ -98,7 +112,7 @@ public class SchemaCreatorWrapper implements SchemaCreator {
         @Override
         public void accept(String sqlCommand) {
             DdlPatchHelper.splitSQL(sqlCommand).stream()
-                    .map(DdlPatchHelper::prepareDDL)
+                    .map((String sql) -> DdlPatchHelper.prepareDDL(sql, dialect, postProcessor))
                     .forEach(ddlStmt -> doAccept(ddlStmt.getSql(), ddlStmt.getDelimiter()));
         }
 
@@ -113,7 +127,7 @@ public class SchemaCreatorWrapper implements SchemaCreator {
         private void acceptExtraStatements(Collection<String> statements) {
             statements.stream()
                     .flatMap(s -> DdlPatchHelper.splitSQL(s).stream())
-                    .map(DdlPatchHelper::prepareDDL)
+                    .map((String sql) -> DdlPatchHelper.prepareDDL(sql, dialect, postProcessor))
                     .forEach(ddlStmt -> {
                         try {
                             doAccept(ddlStmt.getSql(), ddlStmt.getDelimiter());

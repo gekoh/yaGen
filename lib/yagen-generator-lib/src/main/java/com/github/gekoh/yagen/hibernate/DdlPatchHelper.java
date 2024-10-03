@@ -266,7 +266,7 @@ public class DdlPatchHelper {
         return sqlStmt.trim().length()<1;
     }
 
-    public static SqlStatement prepareDDL(String sql){
+    public static SqlStatement prepareDDL(String sql, Dialect dialect, DdlPostProcessor postProcessor){
         sql = sql.trim();
         String delimiter = "";
 
@@ -290,6 +290,10 @@ public class DdlPatchHelper {
 
         if (delimiter.length() < 1 && sqlWoComments.toString().trim().length() > 0) {
             delimiter = ";";
+        }
+
+        if (postProcessor != null) {
+            sql = postProcessor.postProcessDDL(sql, dialect);
         }
 
         return new SqlStatementImpl(sql, delimiter);
