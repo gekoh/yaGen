@@ -657,9 +657,7 @@ public class CreateDDL {
             return sqlCreate;
         }
 
-        getProfile().duplex(ObjectType.TABLE, tableName, sqlCreate);
-
-        buf.insert(0, sqlCreate);
+        buf.insert(0, duplex(ObjectType.TABLE, tableName, sqlCreate));
         buf.insert(0, STATEMENT_SEPARATOR);
 
         return buf.toString();
@@ -869,9 +867,7 @@ public class CreateDDL {
                     checkObjectName(dialect, constraintName);
                 }
 
-                getProfile().duplex(ObjectType.INDEX, constraintName, ddl);
-
-                buf.append(STATEMENT_SEPARATOR).append(ddl);
+                buf.append(STATEMENT_SEPARATOR).append(duplex(ObjectType.INDEX, constraintName, ddl));
             }
             for (Index index : annotation.indexes()) {
                 addIndex(buf, index, dialect, tableConfig, tableName, shortNameSuffix);
@@ -910,9 +906,7 @@ public class CreateDDL {
             checkObjectName(dialect, indexName);
         }
 
-        getProfile().duplex(ObjectType.INDEX, indexName, ddl);
-
-        buf.append(STATEMENT_SEPARATOR).append(ddl);
+        buf.append(STATEMENT_SEPARATOR).append(duplex(ObjectType.INDEX, indexName, ddl));
     }
 
     public String updateCreateConstraint(Dialect dialect, StringBuffer buf, String name, Table table, Constraint constraint) {
@@ -1013,7 +1007,7 @@ public class CreateDDL {
                 }
             }
 
-            getProfile().duplex(ObjectType.CONSTRAINT, name, buf.toString());
+            duplex(ObjectType.CONSTRAINT, name, buf.toString());
 
             if (constraint.getColumnSpan() == 1 && hasIndex(table, tableNameLC, singleColumn)) {
                 LOG.debug("not creating foreign key index as there is already an index on table " + tableNameLC + " and column " + colList.toString());
@@ -1030,9 +1024,7 @@ public class CreateDDL {
                     tblColNameHasSingleColIndex.add(tableNameLC + "." + colList.toString());
                 }
 
-                buf.append(STATEMENT_SEPARATOR).append("-- auto create index on foreign key constraint\n").append(objDdl);
-
-                getProfile().duplex(ObjectType.INDEX, fkIndexName, objDdl.toString());
+                buf.append(STATEMENT_SEPARATOR).append("-- auto create index on foreign key constraint\n").append(duplex(ObjectType.INDEX, fkIndexName, objDdl.toString()));
             }
         }
 
@@ -1095,9 +1087,7 @@ public class CreateDDL {
                 sql.append(buf.substring(0, matcher.start(3))).append(i18nTblName).append(buf.substring(matcher.end(3)));
             }
 
-            getProfile().duplex(ObjectType.INDEX, name, sql.toString());
-            
-            return sql.toString();
+            return duplex(ObjectType.INDEX, name, sql.toString());
         }
 
         if (columns.size() == 1) {
@@ -1108,9 +1098,7 @@ public class CreateDDL {
             tblColNameHasSingleColIndex.add(tableNameLC + "." + columns.get(0).getName().toLowerCase());
         }
 
-        getProfile().duplex(ObjectType.INDEX, name, buf.toString());
-
-        return buf.toString();
+        return duplex(ObjectType.INDEX, name, buf.toString());
     }
 
     public String updateCreateSequence(Dialect dialect, String sqlCreate) {
@@ -1191,9 +1179,7 @@ public class CreateDDL {
         StringWriter wr = new StringWriter();
         mergeTemplateFromResource(template, wr, context);
 
-        getProfile().duplex(ObjectType.TRIGGER, triggerName, wr.toString());
-
-        buf.append(STATEMENT_SEPARATOR).append(wr.toString());
+        buf.append(STATEMENT_SEPARATOR).append(duplex(ObjectType.TRIGGER, triggerName, wr.toString()));
 
         return triggerName;
     }
@@ -1215,6 +1201,11 @@ public class CreateDDL {
 
         setNewOldVar(dialect, context);
         return context;
+    }
+
+    private String duplex(ObjectType type, String objectName, String ddl) {
+        getProfile().duplex(type, objectName, ddl);
+        return ddl;
     }
 
     private String addDefaultValues(Dialect dialect, String sqlCreate, String nameLC) {
@@ -1396,8 +1387,6 @@ public class CreateDDL {
             return;
         }
 
-        StringWriter wr = new StringWriter();
-
         VelocityContext context = newVelocityContext(dialect);
         context.put("liveTableName", nameLC);
         putIfExisting(context, "created_at", AuditInfo.CREATED_AT, columns);
@@ -1411,6 +1400,7 @@ public class CreateDDL {
         }
         else {
             try {
+                StringWriter wr = new StringWriter();
                 templateName += "SingleOperation.vm.pl.sql";
                 wr.append(STATEMENT_SEPARATOR); writeTriggerSingleOperation(dialect, wr, templateName, context, nameLC, "_at", "I"); wr.write("\n/\n");
                 wr.append(STATEMENT_SEPARATOR); writeTriggerSingleOperation(dialect, wr, templateName, context, nameLC, "_at", "U"); wr.write("\n/\n");
@@ -1431,28 +1421,32 @@ public class CreateDDL {
     private void writePostgreSqlAuditTrigger(Dialect dialect, StringBuffer buf, String tableNameLC, boolean singleTimestamp, Set<String> columns) {
         String triggerName = getProfile().getNamingStrategy().triggerName(getEntityClassName(tableNameLC), tableNameLC, null, Constants._ATR);
 
+        StringBuilder objSb = new StringBuilder();
+
         if (maxObjectNameLength != null && triggerName.length() > maxObjectNameLength) {
             triggerName = getShortName(tableNameLC) + Constants._ATR;
         }
 
         checkObjectName(dialect, triggerName);
 
-        buf.append(STATEMENT_SEPARATOR)
+        objSb.append(STATEMENT_SEPARATOR)
                 .append("create trigger ").append(triggerName).append("\n")
                 .append("before insert or update on ").append(tableNameLC).append("\n")
                 .append("for each row\n")
                 .append("execute procedure ");
 
         if (singleTimestamp) {
-            buf.append("audit_trigger_function_single('").append(AuditInfo.LAST_MODIFIED_AT).append("'");
+            objSb.append("audit_trigger_function_single('").append(AuditInfo.LAST_MODIFIED_AT).append("'");
             if (columns.contains(AuditInfo.LAST_MODIFIED_BY)) {
-                buf.append(", '").append(AuditInfo.LAST_MODIFIED_BY).append("'");
+                objSb.append(", '").append(AuditInfo.LAST_MODIFIED_BY).append("'");
             }
-            buf.append(")");
+            objSb.append(")");
         }
         else {
-            buf.append("audit_trigger_function()");
+            objSb.append("audit_trigger_function()");
         }
+
+        buf.append(duplex(ObjectType.TRIGGER, triggerName, objSb.toString()));
     }
 
     private void writeOracleAuditTrigger(Dialect dialect, StringBuffer buf, VelocityContext context, String tableNameLC, String templateName) {
@@ -1473,7 +1467,7 @@ public class CreateDDL {
         buf.append(wr.toString());
         buf.append("\n/");
 
-        getProfile().duplex(ObjectType.TRIGGER, triggerName, wr.toString());
+        duplex(ObjectType.TRIGGER, triggerName, wr.toString());
     }
 
     private String getEntityClassName(String tableName) {
@@ -1593,9 +1587,9 @@ public class CreateDDL {
             return;
         }
 
-        getProfile().duplex(ObjectType.COMMENT, null, ddl.toString());
-
-        buf.append(STATEMENT_SEPARATOR).append(ddl.toString()).append("\n/");
+        buf.append(STATEMENT_SEPARATOR).append(
+                duplex(ObjectType.COMMENT, null, ddl.toString())
+        ).append("\n/");
     }
 
     private void addComment(StringBuilder ddl, String tableName, String columnName, String comment) {
@@ -1779,9 +1773,7 @@ public class CreateDDL {
         StringWriter wr = new StringWriter();
         mergeTemplateFromResource("postgres/DeferredConstraintTriggerFunction.vm.pl.sql", wr, context);
 
-        getProfile().duplex(ObjectType.VIEW, objectName, wr.toString());
-
-        return wr.toString();
+        return duplex(ObjectType.VIEW, objectName, wr.toString());
     }
 
     private String getShortName(String tableName) {
@@ -1968,9 +1960,7 @@ public class CreateDDL {
             }
         }
 
-        getProfile().duplex(ObjectType.TABLE, i18nTblName, sql.toString());
-
-        return sql.toString();
+        return duplex(ObjectType.TABLE, i18nTblName, sql.toString());
     }
     
     private String getI18NDetailViewCreateString (Dialect dialect, String i18nDetailTblName, String baseEntityTableName, String i18nTblName, String i18nFKColName, Set<String> columns, TableConfig tableConfig) {
@@ -1990,9 +1980,8 @@ public class CreateDDL {
         StringWriter wr = new StringWriter();
         mergeTemplateFromResource(isOracle(dialect) ? "I18NDetailView.vm.sql" : "I18NDetailView.hsqldb.vm.sql", wr, context);
 
-        getProfile().duplex(ObjectType.VIEW, i18nDetailTblName, wr.toString());
 
-        return wr.toString();
+        return duplex(ObjectType.VIEW, i18nDetailTblName, wr.toString());
     }
 
     private void writeI18NDetailViewTriggerCreateString (Dialect dialect, StringBuffer buf, String i18nDetailTblName, String i18nTblName, String i18nFKColName, Set<String> columns) {
@@ -2011,9 +2000,9 @@ public class CreateDDL {
 
             mergeTemplateFromResource("I18NDetailViewTrigger.vm.pl.sql", wr, context);
 
-            getProfile().duplex(ObjectType.TRIGGER, objectName, wr.toString());
-
-            buf.append(STATEMENT_SEPARATOR).append(wr.toString()).append("\n/\n");
+            buf.append(STATEMENT_SEPARATOR).append(
+                    duplex(ObjectType.TRIGGER, objectName, wr.toString())
+            ).append("\n/\n");
         }
         else if (isPostgres(dialect)) {
             String triggerName = getProfile().getNamingStrategy().triggerName(triggerBaseName + "_TRG");
@@ -2022,13 +2011,14 @@ public class CreateDDL {
 
             mergeTemplateFromResource("I18NDetailViewTrigger.vm.pl.sql", wr, context);
 
-            buf.append(STATEMENT_SEPARATOR).append(wr.toString()).append("\n/\n");
+            buf.append(STATEMENT_SEPARATOR).append(duplex(ObjectType.FUNCTION, objectName, wr.toString())).append("\n/\n");
 
-            buf.append(STATEMENT_SEPARATOR)
-                    .append("create trigger ").append(triggerName).append("\n")
-                    .append("instead of insert or update or delete on ").append(i18nDetailTblName).append("\n")
-                    .append("for each row\n")
-                    .append("execute procedure ").append(objectName).append("()");
+            String ddl = "create trigger " + triggerName + "\n" +
+                    "instead of insert or update or delete on " + i18nDetailTblName + "\n" +
+                    "for each row\n" +
+                    "execute procedure " + objectName + "()";
+
+            buf.append(STATEMENT_SEPARATOR).append(duplex(ObjectType.TRIGGER, triggerName, ddl));
         }
         else {
             try {
@@ -2053,12 +2043,8 @@ public class CreateDDL {
                                             Set<String> blobCols,
                                             Map<String, Column> columnMap) {
         String objectName = tableName + "_htr";
-
-        String histTriggerSource = getHistTriggerSource(dialect, objectName, tableName, histTableName, histColName, columns, pkColumns, histRelevantCols, blobCols, columnMap);
-
-        getProfile().duplex(ObjectType.TRIGGER, objectName, histTriggerSource);
-
-        return histTriggerSource;
+        return duplex(ObjectType.TRIGGER, objectName,
+                getHistTriggerSource(dialect, objectName, tableName, histTableName, histColName, columns, pkColumns, histRelevantCols, blobCols, columnMap));
     }
 
     private String getPostgreSQLHistTriggerFunction (Dialect dialect,
@@ -2070,7 +2056,9 @@ public class CreateDDL {
                                                      List<String> histRelevantCols,
                                                      Set<String> blobCols,
                                                      Map<String, Column> columnMap) {
-        return getHistTriggerSource(dialect, tableName + "_htr_function", tableName, histTableName, histColName, columns, pkColumns, histRelevantCols, blobCols, columnMap);
+        String objectName = tableName + "_htr_function";
+        return duplex(ObjectType.TRIGGER, objectName,
+                getHistTriggerSource(dialect, objectName, tableName, histTableName, histColName, columns, pkColumns, histRelevantCols, blobCols, columnMap));
     }
 
     private String getHistTriggerSource (Dialect dialect,
@@ -2234,7 +2222,7 @@ public class CreateDDL {
 
         wr.write(object);
 
-        getProfile().duplex(ObjectType.TRIGGER, triggerName, objWr.toString());
+        duplex(ObjectType.TRIGGER, triggerName, objWr.toString());
     }
 
     private String getHistTableSqlCreateString (Dialect dialect,
@@ -2386,9 +2374,7 @@ public class CreateDDL {
 //        not adding default values to history tables, this will make investigations very hard
 //        sqlCreateString = addDefaultValues(sqlCreateString, histTableName.toLowerCase());
 
-        getProfile().duplex(ObjectType.TABLE, histTableName, sqlCreateString);
-
-        return sqlCreateString + additionalObjects.toString();
+        return duplex(ObjectType.TABLE, histTableName, sqlCreateString) + additionalObjects.toString();
     }
     
     private static void mergeTemplateFromResource(String resource, Writer wr, VelocityContext context) {
