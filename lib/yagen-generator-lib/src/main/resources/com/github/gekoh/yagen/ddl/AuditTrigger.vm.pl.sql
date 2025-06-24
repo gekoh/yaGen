@@ -26,7 +26,7 @@ begin
   user_name:= substr(get_audit_user(user_name), 1, ${MODIFIER_COLUMN_NAME_LENGTH});
 
   if INSERTING then
-    :new.${created_at} := systimestamp;
+    :new.${created_at} := get_audit_timestamp();
     :new.${created_by} := user_name;
     :new.${last_modified_at} := null;
     :new.${last_modified_by} := null;
@@ -35,6 +35,6 @@ begin
     :new.${created_at} := :old.${created_at};
     :new.${created_by} := :old.${created_by};
     :new.${last_modified_by} := user_name;
-    :new.${last_modified_at} := systimestamp;
+    :new.${last_modified_at} := get_audit_timestamp();
   end if;
 end;

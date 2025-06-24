@@ -23,6 +23,13 @@ end;
 /
 
 ------- CreateDDL statement separator -------
+create or replace function get_audit_timestamp return timestamp is
+begin
+return systimestamp;
+end;
+/
+
+------- CreateDDL statement separator -------
 create global temporary table SESSION_VARIABLES (
     NAME VARCHAR(255),
     VALUE VARCHAR(255),
@@ -94,6 +101,13 @@ CREATE FUNCTION systimestamp_9() RETURNS ${timestampType}
   LANGUAGE JAVA DETERMINISTIC NO SQL
   EXTERNAL NAME 'CLASSPATH:com.github.gekoh.yagen.util.DBHelper.getCurrentTimestamp'
 ;
+
+------- CreateDDL statement separator -------
+create function get_audit_timestamp() returns ${timestampType}
+begin atomic
+return systimestamp_9();
+end;
+/
 
 ------- CreateDDL statement separator -------
 CREATE FUNCTION regexp_like(s VARCHAR(4000), regexp VARCHAR(500))
@@ -181,16 +195,23 @@ end;
 $$ LANGUAGE PLPGSQL;
 
 ------- CreateDDL statement separator -------
-CREATE or replace FUNCTION systimestamp() RETURNS timestamp AS $$
+CREATE or replace FUNCTION systimestamp() RETURNS ${timestampType} AS $$
 begin
-    return clock_timestamp();
+    return clock_timestamp() at time zone (select reset_val from pg_settings where name='TimeZone');
 end;
 $$ LANGUAGE PLPGSQL;
 
 ------- CreateDDL statement separator -------
 CREATE or replace FUNCTION f_sysdate() RETURNS timestamp AS $$
 begin
-return clock_timestamp();
+return systimestamp();
+end;
+$$ LANGUAGE PLPGSQL;
+
+------- CreateDDL statement separator -------
+create or replace function get_audit_timestamp() RETURNS ${timestampType} AS $$
+begin
+return systimestamp();
 end;
 $$ LANGUAGE PLPGSQL;
 

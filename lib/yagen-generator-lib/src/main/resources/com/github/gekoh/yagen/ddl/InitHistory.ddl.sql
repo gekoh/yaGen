@@ -33,7 +33,7 @@ begin
     from HST_CURRENT_TRANSACTION
     where transaction_id=DBMS_TRANSACTION.LOCAL_TRANSACTION_ID;
 
-    new_transaction_timestamp:=systimestamp;
+    new_transaction_timestamp:=get_audit_timestamp();
     update HST_CURRENT_TRANSACTION set transaction_timestamp=new_transaction_timestamp
     where transaction_id=DBMS_TRANSACTION.LOCAL_TRANSACTION_ID;
 
@@ -85,7 +85,7 @@ end;
 /
 
 ------- CreateDDL statement separator -------
-create procedure set_transaction_timestamp(in timestamp_in timestamp)
+create procedure set_transaction_timestamp(in timestamp_in ${timestampType})
 begin atomic
   declare transaction_id_used bigint;
   set transaction_id_used=0;--txid_current();

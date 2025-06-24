@@ -129,15 +129,15 @@ public class CreateDDL {
 
     private static final int COL_PATTERN_IDX_COLNAME = 2;
     private static final int COL_PATTERN_IDX_TYPE    = 4;
-    private static final int COL_PATTERN_IDX_DEFAULT = 28;
-    private static final int COL_PATTERN_IDX_NOTNULL = 30;
-    private static final int COL_PATTERN_IDX_NOTNULL_CONS_NAME = 32;
-    private static final int COL_PATTERN_IDX_NOT     = 33;
-    private static final int COL_PATTERN_IDX_UNIQUE  = 34;
-    private static final int COL_PATTERN_IDX_UNIQUE_CONS_NAME = 36;
+    private static final int COL_PATTERN_IDX_DEFAULT = 30;
+    private static final int COL_PATTERN_IDX_NOTNULL = 32;
+    private static final int COL_PATTERN_IDX_NOTNULL_CONS_NAME = 34;
+    private static final int COL_PATTERN_IDX_NOT     = 35;
+    private static final int COL_PATTERN_IDX_UNIQUE  = 36;
+    private static final int COL_PATTERN_IDX_UNIQUE_CONS_NAME = 38;
     private static final String COL_PATTERN_IDX_CHECK  = "check";
     private static final String COL_PATTERN_IDX_CHECK_NAME  = "checkName";
-    private static final Pattern COL_PATTERN = Pattern.compile("([\\(|\\s]?)(" + REGEX_COLNAME + ")([\\s]((varchar(2)?\\([^\\)]+\\))|(number\\([^\\)]+\\))|(numeric\\([^\\)]+\\))|(timestamp(\\s*\\([0-9]+\\))?)|(date)|([cb]lob)|(text)|(char\\([^\\)]+\\))|(int((eger)|[0-9]*))|(bigint)|(bit)|(bool(ean)?)|(((double)|(float[0-9]?(\\s*\\([0-9]+\\))?))( precision)?)))([\\s]+default[\\s]*([^\\s]*))?(([\\s]+constraint[\\s]+([a-zA-Z]+[0-9a-zA-Z_]*))?([\\s]+not)?[\\s]+null)?" +
+    private static final Pattern COL_PATTERN = Pattern.compile("([\\(|\\s]?)(" + REGEX_COLNAME + ")([\\s]((varchar(2)?\\([^\\)]+\\))|(number\\([^\\)]+\\))|(numeric\\([^\\)]+\\))|(timestamp(\\s*\\([0-9]+\\))?( with(out)? time zone)?)|(date)|([cb]lob)|(text)|(char\\([^\\)]+\\))|(int((eger)|[0-9]*))|(bigint)|(bit)|(bool(ean)?)|(((double)|(float[0-9]?(\\s*\\([0-9]+\\))?))( precision)?)))([\\s]+default[\\s]*([^\\s]*))?(([\\s]+constraint[\\s]+([a-zA-Z]+[0-9a-zA-Z_]*))?([\\s]+not)?[\\s]+null)?" +
             "(([\\s]+constraint[\\s]+([a-zA-Z]+[0-9a-zA-Z_]*))?[\\s]+unique)?" +
             "(?<" + COL_PATTERN_IDX_CHECK + ">([\\s]+constraint[\\s]+(?<" + COL_PATTERN_IDX_CHECK_NAME + ">[a-zA-Z]+[0-9a-zA-Z_]*))?[\\s]+check[\\s]+\\(([^\\()]+\\([^\\)]+\\))*\\))?" +
             "[^\\(,]*(,|\\))");

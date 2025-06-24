@@ -21,7 +21,7 @@ begin atomic
 
   set new.${last_modified_by} = substr(get_audit_user(user_name), 1, ${MODIFIER_COLUMN_NAME_LENGTH});
 #end
-  set new.${last_modified_at} = systimestamp_9();
+  set new.${last_modified_at} = get_audit_timestamp();
 #if( $bypassFunctionality )
   end if;
 #end
