@@ -544,22 +544,28 @@ public class CreateDDL {
                     buf.append(STATEMENT_SEPARATOR)
                             .append(getPostgreSQLHistTriggerFunction(dialect, liveTableName, histTableName, histColNameLC, columnNames, pkCols, historyRelevantCols, blobCols, columnMap));
 
-                    buf.append(STATEMENT_SEPARATOR)
-                            .append("create trigger ").append(liveTableName).append("_htU\n")
+                    StringBuilder ddl = new StringBuilder();
+                    String objectName = liveTableName + "_htU";
+                    ddl
+                            .append("create trigger ").append(objectName).append("\n")
                             .append("after update on ").append(liveTableName).append("\n")
                             .append("for each row\n")
                             .append("when (");
                     for (String historyRelevantCol : historyRelevantCols) {
-                        buf.append("new.").append(historyRelevantCol).append(" is distinct from old.").append(historyRelevantCol).append(" or\n");
+                        ddl.append("new.").append(historyRelevantCol).append(" is distinct from old.").append(historyRelevantCol).append(" or\n");
                     }
-                    buf.delete(buf.length()-4, buf.length());
-                    buf.append(")\nexecute procedure ").append(liveTableName).append("_htr_function()");
+                    ddl.delete(ddl.length()-4, ddl.length());
+                    ddl.append(")\nexecute procedure ").append(liveTableName).append("_htr_function()");
 
-                    buf.append(STATEMENT_SEPARATOR)
-                            .append("create trigger ").append(liveTableName).append("_htr\n")
-                            .append("after insert or delete on ").append(liveTableName).append("\n")
-                            .append("for each row\n")
-                            .append("execute procedure ").append(liveTableName).append("_htr_function()");
+                    buf.append(STATEMENT_SEPARATOR).append(duplex(ObjectType.TRIGGER, objectName, ddl.toString()));
+
+                    objectName = liveTableName + "_htr";
+                    String ddlStr = "create trigger " + objectName + "\n" +
+                            "after insert or delete on " + liveTableName + "\n" +
+                            "for each row\n" +
+                            "execute procedure " + liveTableName + "_htr_function()";
+
+                    buf.append(STATEMENT_SEPARATOR).append(duplex(ObjectType.TRIGGER, objectName, ddlStr));
                 }
                 else {
                     buf.append(getHsqlDBHistTriggerSql(dialect, liveTableName, histTableName, histColNameLC, columnNames, pkCols, historyRelevantCols, columnMap));
@@ -2057,7 +2063,7 @@ public class CreateDDL {
                                                      Set<String> blobCols,
                                                      Map<String, Column> columnMap) {
         String objectName = tableName + "_htr_function";
-        return duplex(ObjectType.TRIGGER, objectName,
+        return duplex(ObjectType.FUNCTION, objectName,
                 getHistTriggerSource(dialect, objectName, tableName, histTableName, histColName, columns, pkColumns, histRelevantCols, blobCols, columnMap));
     }
 
