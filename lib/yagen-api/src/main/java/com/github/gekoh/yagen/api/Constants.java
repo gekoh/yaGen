@@ -29,7 +29,7 @@ public class Constants {
     public static final String _UK = "_UK";
     public static final String _PK = "_PK";
 
-    public static final int USER_NAME_LEN = 35;
+    public static final int DEFAULT_USER_NAME_LEN = 35;
     public static final int UUID_LEN = 32;
     public static final int ENUM_DEFAULT_LEN = 30;
 }

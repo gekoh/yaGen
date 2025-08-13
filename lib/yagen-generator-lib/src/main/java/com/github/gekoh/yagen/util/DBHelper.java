@@ -42,7 +42,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
-import static com.github.gekoh.yagen.api.Constants.USER_NAME_LEN;
+import static com.github.gekoh.yagen.api.Constants.DEFAULT_USER_NAME_LEN;
 
 /**
  * @author Georg Kohlweiss
@@ -61,6 +61,7 @@ public class DBHelper {
     public static final String PROPERTY_BYPASS_REGEX = "yagen.bypass.regex";
     public static final String PROPERTY_SKIP_MODIFICATION = "yagen.skip-modification.regex";
     public static final String PROPERTY_POST_PROCESSOR_CLASS = "yagen.ddl.postprocessor.class";
+    public static final String PROPERTY_AUDIT_USERCOL_LEN = "yagen.generator.audit.user.maxlen";
 
     public static final String PROPERTY_POSTGRES_USE_UUID_OSSP_EXTENSION = "yagen.generator.postgres.extension.uuid-ossp";
 
@@ -312,8 +313,9 @@ public class DBHelper {
     public static String injectSessionUser(String user, EntityManager em) {
         String prevUser;
 
-        if (isPostgres(getDialect(em))
-                || isHsqlDb(getDialect(em))) {
+        Dialect dialect = getDialect(em);
+        if (isPostgres(dialect)
+                || isHsqlDb(dialect)) {
             prevUser = getSessionVariable("CLIENT_IDENTIFIER", em);
             if (user == null) {
                 removeSessionVariable("CLIENT_IDENTIFIER", em);
@@ -322,7 +324,7 @@ public class DBHelper {
             }
         }
         else {
-            prevUser = em.unwrap(Session.class).doReturningWork(new SetUserWorkOracle(user));
+            prevUser = em.unwrap(Session.class).doReturningWork(new SetUserWorkOracle(user, dialect));
         }
 
         return prevUser;
@@ -352,6 +354,17 @@ public class DBHelper {
     private static boolean dialectMatches(Dialect dialect, String subStr) {
         String driverClassName = getDriverClassName(dialect);
         return driverClassName != null ? driverClassName.toLowerCase().contains(subStr) : dialect.getClass().getName().toLowerCase().contains(subStr);
+    }
+
+    public static int getAuditUserMaxlength (Dialect dialect) {
+        Metadata metadata = getMetadata(dialect);
+        if (metadata != null) {
+            Map values = getConfigurationValues(metadata);
+            if (values != null && values.get(PROPERTY_AUDIT_USERCOL_LEN) != null) {
+                return Integer.parseInt((String) values.get(PROPERTY_AUDIT_USERCOL_LEN));
+            }
+        }
+        return DEFAULT_USER_NAME_LEN;
     }
 
     public static Metadata getMetadata(Dialect dialect) {
@@ -449,15 +462,18 @@ public class DBHelper {
     }
 
     public static class SetUserWorkOracle implements ReturningWork<String> {
+        private Dialect dialect;
         private String userName;
 
-        public SetUserWorkOracle(String userName) {
+        public SetUserWorkOracle(String userName, Dialect dialect) {
             this.userName = userName;
+            this.dialect = dialect;
         }
 
         public String execute(Connection connection) throws SQLException {
+            int auditUserMaxlength = getAuditUserMaxlength(dialect);
             CallableStatement statement = connection.prepareCall(
-                    "declare newUserValue varchar2(" + USER_NAME_LEN + ") := substr(?,1," + USER_NAME_LEN + "); " +
+                    "declare newUserValue varchar2(" + auditUserMaxlength + ") := substr(?,1," + auditUserMaxlength + "); " +
                             "begin ? := sys_context('USERENV','CLIENT_IDENTIFIER'); " +
                             "DBMS_SESSION.set_identifier(newUserValue); " +
                             "end;"

@@ -1,3 +1,9 @@
+#if( $configuration['yagen.generator.audit.user.maxlen'])
+#set( $auditUserLen = $configuration['yagen.generator.audit.user.maxlen'] )
+#else
+#set( $auditUserLen = 35 )
+#end
+
 #if( $is_oracle )
 ------- CreateDDL statement separator -------
 create or replace function get_audit_user(client_user_in in varchar2) return varchar2
@@ -10,7 +16,7 @@ begin
   user_name:=substr(regexp_replace(regexp_replace(coalesce(user_name, sys_context('USERENV','CLIENT_IDENTIFIER'), sys_context('USERENV','OS_USER')),
              '^(.*)@.*$', '\1'),
              '^.*CN=([^, ]*).*$', '\1'),
-    1, 35 /*user column length*/ -3 -length(user));
+    1, $auditUserLen /*user column length*/ -3 -length(user));
   return user || case when user_name is not null and lower(user) <> lower(user_name) then ' ('||user_name||')' else '' end;
 end;
 /
@@ -164,7 +170,7 @@ begin atomic
   set user_name = substr(regexp_replace(regexp_replace(coalesce(user_name, sys_context('USERENV','CLIENT_IDENTIFIER'), sys_context('USERENV','OS_USER')),
     '^(.*)@.*$', '\1'),
     '^.*CN=([^, ]*).*$', '\1'),
-    1, 35 /*user column length*/ -3 -length(user));
+    1, $auditUserLen /*user column length*/ -3 -length(user));
   return user || case when user_name is not null and lower(user) <> lower(user_name) then ' ('||user_name||')' else '' end;
 end;
 #end
@@ -256,7 +262,7 @@ begin
   user_name:=substr(regexp_replace(regexp_replace(coalesce(user_name, sys_context('USERENV','CLIENT_IDENTIFIER'), sys_context('USERENV','OS_USER')),
              '^(.*)@.*$', '\1'),
              '^.*CN=([^, ]*).*$', '\1'),
-    1, 35 /*user column length*/ -3 -length(user));
+    1, $auditUserLen /*user column length*/ -3 -length(user));
   return user || case when user_name is not null and lower(user) <> lower(user_name) then ' ('||user_name||')' else '' end;
 end;
 $$ LANGUAGE PLPGSQL;
@@ -311,7 +317,9 @@ BEGIN
     elsif TG_OP = 'UPDATE' then
         new.created_at := old.created_at;
         new.created_by := old.created_by;
-        if not(new.last_modified_at is not null and (old.last_modified_at is null or new.last_modified_at <> old.last_modified_at )) then
+        if new.last_modified_at is not null and (old.last_modified_at is null or new.last_modified_at <> old.last_modified_at ) then
+          new.last_modified_by := get_audit_user(new.last_modified_by);
+        else
           new.last_modified_by := get_audit_user(cast(user as varchar));
         end if;
         new.last_modified_at := get_audit_timestamp();

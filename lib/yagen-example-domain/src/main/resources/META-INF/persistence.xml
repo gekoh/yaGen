@@ -32,6 +32,7 @@
             <property name="yagen.generator.profile.providerClass" value="com.github.gekoh.yagen.example.ddl.ExampleProfileProvider"/>
             <property name="hibernate.schema_management_tool" value="com.github.gekoh.yagen.hibernate.schema.SchemaManagementToolWrapper"/>
             <property name="yagen.generator.postgres.extension.uuid-ossp" value="create"/>
+            <property name="yagen.generator.audit.user.maxlen" value="40"/>
         </properties>
 
     </persistence-unit>

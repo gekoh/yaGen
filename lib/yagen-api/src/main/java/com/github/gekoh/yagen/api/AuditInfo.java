@@ -41,7 +41,7 @@ public abstract class AuditInfo implements Serializable {
     /**
      * Entity was created by.
      */
-    @Column(name = CREATED_BY, length = Constants.USER_NAME_LEN, nullable = false)
+    @Column(name = CREATED_BY, length = Constants.DEFAULT_USER_NAME_LEN, nullable = false)
     private String createdBy;
 
     /**
@@ -53,7 +53,7 @@ public abstract class AuditInfo implements Serializable {
     /**
      * Entity was last modified by.
      */
-    @Column(name = LAST_MODIFIED_BY, length = Constants.USER_NAME_LEN)
+    @Column(name = LAST_MODIFIED_BY, length = Constants.DEFAULT_USER_NAME_LEN)
     private String lastModifiedBy;
 
     public AuditInfo() {

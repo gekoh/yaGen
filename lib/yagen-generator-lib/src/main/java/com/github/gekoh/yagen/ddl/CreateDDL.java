@@ -442,7 +442,7 @@ public class CreateDDL {
 
         Auditable auditable = tableConfig.getTableAnnotationOfType(Auditable.class);
         if (auditable != null && auditable.createNonExistingColumns()) {
-            sqlCreate = addAuditColumns(dialect, sqlCreate, columns, auditable.userNameLength(), getAuditColumnsNeeded(entityClassName));
+            sqlCreate = addAuditColumns(dialect, sqlCreate, columns, auditable.userNameLength() > 0 ? auditable.userNameLength() : DBHelper.getAuditUserMaxlength(dialect), getAuditColumnsNeeded(entityClassName));
         }
 
         sqlCreate = processCascadeNullable(dialect, buf, nameLC, sqlCreate, tableConfig.getColumnNamesIsCascadeNullable());
@@ -1399,7 +1399,7 @@ public class CreateDDL {
         putIfExisting(context, "created_by", AuditInfo.CREATED_BY, columns);
         putIfExisting(context, "last_modified_at", AuditInfo.LAST_MODIFIED_AT, columns);
         putIfExisting(context, "last_modified_by", AuditInfo.LAST_MODIFIED_BY, columns);
-        context.put("MODIFIER_COLUMN_NAME_LENGTH", Constants.USER_NAME_LEN);
+        context.put("MODIFIER_COLUMN_NAME_LENGTH", DBHelper.getAuditUserMaxlength(dialect));
 
         if (isOracle(dialect)) {
             writeOracleAuditTrigger(dialect, buf, context, nameLC, templateName + ".vm.pl.sql");
@@ -2094,8 +2094,9 @@ public class CreateDDL {
         context.put("VERSION_COLUMN_NAME", VERSION_COLUMN_NAME);
         if (columns.contains(AuditInfo.LAST_MODIFIED_BY)) {
             context.put("MODIFIER_COLUMN_NAME", AuditInfo.LAST_MODIFIED_BY);
-            context.put("MODIFIER_COLUMN_NAME_LENGTH", Constants.USER_NAME_LEN);
-            context.put("MODIFIER_COLUMN_TYPE", getVarcharDdlTypeDeclaration(dialect, Constants.USER_NAME_LEN));
+            int defaultUserNameLen = DBHelper.getAuditUserMaxlength(dialect);
+            context.put("MODIFIER_COLUMN_NAME_LENGTH", defaultUserNameLen);
+            context.put("MODIFIER_COLUMN_TYPE", getVarcharDdlTypeDeclaration(dialect, defaultUserNameLen));
         }
         context.put("objectName", objectName);
         context.put("liveTableName", tableName);
@@ -2131,8 +2132,9 @@ public class CreateDDL {
         context.put("VERSION_COLUMN_NAME", VERSION_COLUMN_NAME);
         if (columns.contains(AuditInfo.LAST_MODIFIED_BY)) {
             context.put("MODIFIER_COLUMN_NAME", AuditInfo.LAST_MODIFIED_BY);
-            context.put("MODIFIER_COLUMN_NAME_LENGTH", Constants.USER_NAME_LEN);
-            context.put("MODIFIER_COLUMN_TYPE", getVarcharDdlTypeDeclaration(dialect, Constants.USER_NAME_LEN));
+            int defaultUserNameLen = DBHelper.getAuditUserMaxlength(dialect);
+            context.put("MODIFIER_COLUMN_NAME_LENGTH", defaultUserNameLen);
+            context.put("MODIFIER_COLUMN_TYPE", getVarcharDdlTypeDeclaration(dialect, defaultUserNameLen));
         }
         context.put("liveTableName", tableName);
         context.put("hstTableName", histTableName);
@@ -2174,8 +2176,9 @@ public class CreateDDL {
         context.put("VERSION_COLUMN_NAME", VERSION_COLUMN_NAME);
         if (columns.contains(AuditInfo.LAST_MODIFIED_BY)) {
             context.put("MODIFIER_COLUMN_NAME", AuditInfo.LAST_MODIFIED_BY);
-            context.put("MODIFIER_COLUMN_NAME_LENGTH", Constants.USER_NAME_LEN);
-            context.put("MODIFIER_COLUMN_TYPE", getVarcharDdlTypeDeclaration(dialect, Constants.USER_NAME_LEN));
+            int defaultUserNameLen = DBHelper.getAuditUserMaxlength(dialect);
+            context.put("MODIFIER_COLUMN_NAME_LENGTH", defaultUserNameLen);
+            context.put("MODIFIER_COLUMN_TYPE", getVarcharDdlTypeDeclaration(dialect, defaultUserNameLen));
         }
         context.put("objectName", viewName);
         context.put("hstTableName", histTableName);
