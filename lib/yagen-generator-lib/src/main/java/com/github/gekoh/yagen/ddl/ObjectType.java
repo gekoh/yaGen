@@ -28,5 +28,6 @@ public enum ObjectType {
     COMMENT,
     PACKAGE,
     FUNCTION,
-    PROCEDURE
+    PROCEDURE,
+    SEQUENCE,
 }

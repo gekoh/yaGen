@@ -583,30 +583,31 @@ public class CreateDDL {
         for (Sequence sequence : tableConfig.getSequences()) {
             String seqName = getProfile().getNamingStrategy().sequenceName(sequence.name());
 
-            buf.append(STATEMENT_SEPARATOR);
-
+            StringBuilder seqBuf = new StringBuilder();
             if (objectNames.contains(seqName.toLowerCase())) {
-                buf.append("-- WARNING: duplicate definition of sequence or name already defined for another object!\n--");
+                seqBuf.append("-- WARNING: duplicate definition of sequence or name already defined for another object!\n--");
             }
             else {
                 checkObjectName(dialect, seqName.toLowerCase());
             }
 
-            buf.append("create sequence ").append(seqName);
+            seqBuf.append("create sequence ").append(seqName);
             
             if (dialect.getSequenceSupport().supportsPooledSequences()) {
-                buf.append(" start with ").append(sequence.startWith())
+                seqBuf.append(" start with ").append(sequence.startWith())
                         .append(" increment by ").append(sequence.incrementBy());
             }
             
             if (isOracle(dialect)) {
                 if (sequence.cache() > 1) {
-                    buf.append(" cache ").append(sequence.cache());
+                    seqBuf.append(" cache ").append(sequence.cache());
                 }
                 if (sequence.order()) {
-                    buf.append(" order");
+                    seqBuf.append(" order");
                 }
             }
+
+            buf.append(STATEMENT_SEPARATOR).append(duplex(ObjectType.SEQUENCE, seqName, seqBuf.toString()));
         }
 
         if (supportsPartitioning(dialect) && partitioning != null) {
@@ -646,7 +647,10 @@ public class CreateDDL {
                 LOG.warn("no key columns defined for layered table view requested for {}", nameLC);
             }
             else {
-                sqlCreate = handleLayeredTable(sqlCreate, buf, layeredTablesView, dialect, columnNames, columnMap);
+                buf.insert(0, handleLayeredTable(sqlCreate, layeredTablesView, dialect, columnNames, columnMap));
+                buf.insert(0, STATEMENT_SEPARATOR);
+
+                sqlCreate = null;
 
                 int idx=0;
                 for (String layeredTableName : layeredTablesView.tableNamesInOrder()) {
@@ -663,8 +667,10 @@ public class CreateDDL {
             return sqlCreate;
         }
 
-        buf.insert(0, duplex(ObjectType.TABLE, tableName, sqlCreate));
-        buf.insert(0, STATEMENT_SEPARATOR);
+        if (StringUtils.isNotEmpty(sqlCreate)) {
+            buf.insert(0, duplex(ObjectType.TABLE, tableName, sqlCreate));
+            buf.insert(0, STATEMENT_SEPARATOR);
+        }
 
         return buf.toString();
     }
@@ -703,7 +709,7 @@ public class CreateDDL {
         return blobCols;
     }
 
-    private String handleLayeredTable(String sqlCreate, StringBuffer buf, LayeredTablesView layeredTablesView, Dialect dialect, Set<String> columnNames, Map<String, Column> columnMap) {
+    private String handleLayeredTable(String sqlCreate, LayeredTablesView layeredTablesView, Dialect dialect, Set<String> columnNames, Map<String, Column> columnMap) {
         Matcher matcher = TBL_PATTERN.matcher(sqlCreate);
         if (!matcher.find()) {
             LOG.warn("found annotation {} but table pattern does not match", layeredTablesView);
@@ -779,6 +785,8 @@ public class CreateDDL {
 
         ddl.append(STATEMENT_SEPARATOR);
         ddl.append("-- creating view spanning layered tables ").append(tableNames.substring(2)).append(viewSource.toString());
+
+        duplex(ObjectType.VIEW, tblName, viewSource.toString());
 
         return ddl.toString();
     }
@@ -1319,7 +1327,7 @@ public class CreateDDL {
 
         mergeTemplateFromResource("TimelineView.vm.sql", objWr, context);
 
-        return objWr.toString();
+        return duplex(ObjectType.VIEW, viewName, objWr.toString());
     }
 
     private Object findClobColumns(TableConfig tblConfig) {
@@ -2199,7 +2207,7 @@ public class CreateDDL {
             dbObjects.add(object);
         }
 
-        return object;
+        return duplex(ObjectType.VIEW, viewName, object);
     }
 
     private Set<String> getNonPkCols(Set<String> columns, List<String> pkColumns) {
