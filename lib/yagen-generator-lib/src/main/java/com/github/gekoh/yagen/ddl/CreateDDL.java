@@ -1636,8 +1636,10 @@ public class CreateDDL {
             String defColName = matcher.group(COL_PATTERN_IDX_COLNAME);
             String colName = TableConfig.getIdentifierForReference(defColName);
 
-            // name not null constraint
-            idx = appendConstraint(b, sqlCreate, nameLC, colName, idx, matcher, COL_PATTERN_IDX_NOTNULL, COL_PATTERN_IDX_NOTNULL_CONS_NAME, Constants._NN);
+            // name not null constraint (will be disregarden by PostgreSQL, thus omitting for this RDBMS)
+            if (!isPostgres(dialect)) {
+                idx = appendConstraint(b, sqlCreate, nameLC, colName, idx, matcher, COL_PATTERN_IDX_NOTNULL, COL_PATTERN_IDX_NOTNULL_CONS_NAME, Constants._NN);
+            }
 
             // name unique constraint
             idx = appendConstraint(b, sqlCreate, nameLC, colName, idx, matcher, COL_PATTERN_IDX_UNIQUE, COL_PATTERN_IDX_UNIQUE_CONS_NAME, Constants._UK);
@@ -1645,7 +1647,7 @@ public class CreateDDL {
             // check constraint
             idx = appendConstraint(b, sqlCreate, nameLC, colName, idx, matcher, COL_PATTERN_IDX_CHECK, COL_PATTERN_IDX_CHECK_NAME, Constants._CK);
 
-            b.append(sqlCreate.substring(idx, matcher.end()));
+            b.append(sqlCreate, idx, matcher.end());
             idx = matcher.end();
         }
 
@@ -1661,7 +1663,7 @@ public class CreateDDL {
             // name unique constraint
             idx = appendConstraint(b, sqlCreate, nameLC, DefaultNamingStrategy.concatColumnNames(matcher.group(UNIQUE_PATTERN_IDX_UNIQUE_COLS)), idx, matcher, UNIQUE_PATTERN_IDX_UNIQUE_FULL, UNIQUE_PATTERN_IDX_UNIQUE_NAME, Constants._UK);
 
-            b.append(sqlCreate.substring(idx, matcher.end()));
+            b.append(sqlCreate, idx, matcher.end());
             idx = matcher.end();
         }
 
@@ -1678,7 +1680,7 @@ public class CreateDDL {
                 b = new StringBuilder();
 
                 idx = matcher.start(TBL_PATTERN_IDX_PK_START);
-                b.append(sqlCreate.substring(0, idx));
+                b.append(sqlCreate, 0, idx);
 
                 // name primary key constraint
                 idx = appendConstraint(b, sqlCreate, nameLC, DefaultNamingStrategy.concatColumnNames(matcher.group(TBL_PATTERN_IDX_PK_COLLIST)), idx, matcher, TBL_PATTERN_IDX_PK_START, TBL_PATTERN_IDX_PK_NAME, Constants._PK);
