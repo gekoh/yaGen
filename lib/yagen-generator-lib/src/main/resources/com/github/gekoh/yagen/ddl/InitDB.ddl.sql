@@ -318,9 +318,10 @@ BEGIN
         new.created_at := old.created_at;
         new.created_by := old.created_by;
         if new.last_modified_at is not null and (old.last_modified_at is null or new.last_modified_at <> old.last_modified_at ) then
-          new.last_modified_by := get_audit_user(new.last_modified_by);
+            -- using last_modified_by injected by application
+            new.last_modified_by := get_audit_user(new.last_modified_by);
         else
-          new.last_modified_by := get_audit_user(cast(user as varchar));
+            new.last_modified_by := get_audit_user(null);
         end if;
         new.last_modified_at := get_audit_timestamp();
     end if;
@@ -349,7 +350,12 @@ end if;
     end if;
     -- dynamic column names not yet supported, only detect if last_modified_by is existing
     if last_modified_by_colname is not null then
-        new.last_modified_by := get_audit_user(new.last_modified_by);
+        if new.last_modified_by is not null and (old.last_modified_by is null or new.last_modified_by <> old.last_modified_by ) then
+            -- using last_modified_by injected by application
+            new.last_modified_by := get_audit_user(new.last_modified_by);
+        else
+            new.last_modified_by := get_audit_user(null);
+        end if;
     end if;
     new.last_modified_at := get_audit_timestamp();
 return new;
