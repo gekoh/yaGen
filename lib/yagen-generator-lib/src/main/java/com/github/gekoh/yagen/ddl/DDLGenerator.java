@@ -162,8 +162,6 @@ public class DDLGenerator {
 
     @SuppressWarnings("UnusedDeclaration")
     public static class Profile implements Cloneable {
-        private static final List<Profile> PROFILES = new ArrayList<>();
-
         private String name;
         private String outputFile;
         private String persistenceUnitName;
@@ -181,14 +179,9 @@ public class DDLGenerator {
 
         private Metadata metadata;
 
-        public static List<Profile> getAllProfiles() {
-            return Collections.unmodifiableList(PROFILES);
-        }
-
         public Profile(String name) {
             this.name = name;
 
-            PROFILES.add(this);
             addHeaderDdl(new DDLGenerator.AddTemplateDDLEntry(DDLGenerator.class.getResource("/com/github/gekoh/yagen/ddl/InitDB.ddl.sql")));
         }
 

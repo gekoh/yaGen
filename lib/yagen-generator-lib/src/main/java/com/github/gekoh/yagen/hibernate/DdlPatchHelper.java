@@ -78,7 +78,7 @@ public class DdlPatchHelper {
 
         if (ea != null) {
             if (ea.getDDLEnhancer() != null) {
-                LOG.warn("replacing current DDL enhancer");
+                LOG.info("replacing current DDL enhancer");
             }
             profile.registerMetadata(metadata);
             ea.initDDLEnhancer(profile, metadata);
