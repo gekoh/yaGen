@@ -203,7 +203,7 @@ $$ LANGUAGE PLPGSQL;
 ------- CreateDDL statement separator -------
 CREATE or replace FUNCTION systimestamp() RETURNS ${timestampType} AS $$
 begin
-    return clock_timestamp() at time zone (select reset_val from pg_settings where name='TimeZone');
+    return clock_timestamp() at time zone (select reset_val from pg_settings where name='log_timezone');
 end;
 $$ LANGUAGE PLPGSQL;
 
