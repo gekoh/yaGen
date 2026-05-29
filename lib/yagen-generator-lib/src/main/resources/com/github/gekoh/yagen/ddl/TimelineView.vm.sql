@@ -186,7 +186,7 @@ mut as (
 #foreach( $selColumn in $columns )
   , CASE l.column_name WHEN '${selColumn.toUpperCase()}' THEN #if
   ( $numericColumns.contains($selColumn) )cast(l.new_value as $numericColumnDefinitions[$selColumn])#elseif
-  ( $timestampColumns.contains($selColumn) )to_timestamp(l.new_value, 'yyyy-mm-dd hh24:mi:ss.ff')#elseif
+  ( $timestampColumns.contains($selColumn) )to_timestamp(l.new_value, 'yyyy-mm-dd hh24:mi:ss.ff')#if( $is_postgres )::timestamp#{end}#elseif
   ( $clobColumns.contains($selColumn) )coalesce(l.new_long_value,'')#{else}coalesce(l.new_value,'')#end END as ${selColumn}
 #end
 	from

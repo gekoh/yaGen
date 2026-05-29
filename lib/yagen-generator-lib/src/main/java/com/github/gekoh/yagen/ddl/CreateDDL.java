@@ -547,7 +547,7 @@ public class CreateDDL {
                     StringBuilder ddl = new StringBuilder();
                     String objectName = liveTableName + "_htU";
                     ddl
-                            .append("create trigger ").append(objectName).append("\n")
+                            .append("create or replace trigger ").append(objectName).append("\n")
                             .append("after update on ").append(liveTableName).append("\n")
                             .append("for each row\n")
                             .append("when (");
