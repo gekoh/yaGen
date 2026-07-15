@@ -353,7 +353,7 @@ public class FieldInfo {
         }
     }
 
-    private static final Pattern PATTERN_ATTR_OVERRIDES = Pattern.compile("@" + AttributeOverrides.class.getName() + "\\((value=)?\\{([^}]*)(\\})\\)");
+    private static final Pattern PATTERN_ATTR_OVERRIDES = Pattern.compile("@" + AttributeOverrides.class.getName() + "\\((value=)?\\{(.*)(})\\)");
     private static final Pattern PATTERN_ATTR_OVERRIDE =  Pattern.compile("(@" + AttributeOverride.class.getName() + "\\([^)]*@" + Column.class.getName() + "\\([^)]*\\)[^)]*\\))(, )?");
 
     /**
