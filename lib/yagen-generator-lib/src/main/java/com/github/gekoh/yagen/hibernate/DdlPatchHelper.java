@@ -18,7 +18,7 @@ package com.github.gekoh.yagen.hibernate;
 import com.github.gekoh.yagen.ddl.CreateDDL;
 import com.github.gekoh.yagen.ddl.DDLGenerator;
 import com.github.gekoh.yagen.util.DBHelper;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.hibernate.boot.Metadata;
 import org.hibernate.boot.model.relational.Sequence;
 import org.hibernate.dialect.Dialect;

@@ -19,7 +19,7 @@ import com.github.gekoh.yagen.api.CheckConstraint;
 import com.github.gekoh.yagen.api.Index;
 import com.github.gekoh.yagen.api.Table;
 import com.github.gekoh.yagen.api.UniqueConstraint;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.hibernate.boot.model.naming.Identifier;
 import org.hibernate.engine.jdbc.env.spi.JdbcEnvironment;
 import org.hibernate.internal.util.StringHelper;

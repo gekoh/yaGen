@@ -42,7 +42,7 @@ import jakarta.persistence.DiscriminatorValue;
 import jakarta.persistence.JoinTable;
 import jakarta.persistence.Lob;
 import jakarta.persistence.MappedSuperclass;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.velocity.VelocityContext;
 import org.apache.velocity.app.Velocity;
 import org.hibernate.boot.Metadata;
