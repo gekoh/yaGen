@@ -17,15 +17,11 @@ package com.github.gekoh.yagen.example;
 
 import com.github.gekoh.yagen.api.Default;
 import com.github.gekoh.yagen.api.TemporalEntity;
-import io.hypersistence.utils.hibernate.type.json.JsonBinaryType;
 import jakarta.persistence.*;
-import org.hibernate.annotations.Type;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
-import java.util.Map;
 
 /**
  * @author Georg Kohlweiss
@@ -95,10 +91,11 @@ public class BoardBookEntry extends BaseEntity {
     @Column(name = "ADDED_OPERATING_RESOURCES", nullable = true)
     private Collection<String> addedOperatingResources;
 
-    // for now just to test HST table generation
+    /* uncomment only to test PostgreSQL json/jsonb HST table generation removal of constraints
     @Type(JsonBinaryType.class)
     @Column(name = "properties", columnDefinition = "jsonb", nullable = false)
     private Map<String, Object> properties = new HashMap<String, Object>();
+     */
 
     BoardBookEntry() {
     }
