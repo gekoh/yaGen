@@ -552,9 +552,12 @@ public class CreateDDL {
                             .append("create trigger ").append(objectName).append("\n")
                             .append("after update on ").append(liveTableName).append("\n")
                             .append("for each row\n")
-                            .append("when\n\t(new.").append(String.join(", new.", historyRelevantCols)).append(")\n")
-                            .append("is distinct from\n\t(old.").append(String.join(", old.", historyRelevantCols)).append(")\n");
-                    ddl.append("execute procedure ").append(liveTableName).append("_htr_function()");
+                            .append("when (");
+                    for (String historyRelevantCol : historyRelevantCols) {
+                        ddl.append("new.").append(historyRelevantCol).append(" is distinct from old.").append(historyRelevantCol).append(" or\n");
+                    }
+                    ddl.delete(ddl.length()-4, ddl.length());
+                    ddl.append(")\nexecute procedure ").append(liveTableName).append("_htr_function()");
 
                     buf.append(STATEMENT_SEPARATOR).append(duplex(ObjectType.TRIGGER, objectName, ddl.toString()));
 
