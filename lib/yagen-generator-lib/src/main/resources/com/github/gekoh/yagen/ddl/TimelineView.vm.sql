@@ -49,7 +49,8 @@ select * from (
 #end
 #end
     EFFECTIVE_TIMESTAMP_FROM,
-    lead(EFFECTIVE_TIMESTAMP_FROM) over (partition by UUID order by EFFECTIVE_TIMESTAMP_FROM nulls first) EFFECTIVE_TIMESTAMP_TO
+    lead(EFFECTIVE_TIMESTAMP_FROM) over (partition by UUID order by EFFECTIVE_TIMESTAMP_FROM nulls first) EFFECTIVE_TIMESTAMP_TO,
+    nvl(REV_VERSION_IN_CHANGESET_NR, 1) rn_latest_in_changeset
   from (
     select *
     from (
@@ -159,10 +160,16 @@ recursive changeset_tree (PRECURSOR_CHANGESET_UUID, UUID, CHANGESET_STATUS) AS (
 #if(! $is_hsql )
 , CHANGELOG_ROW_V as (
 #end
-select l.*, #if( $is_postgres )row_number() over()#{else}rownum()#{end} as row_nr
+select l.*, #if( $is_postgres || $is_hsql )row_number() over()#{else}rownum()#{end} as row_nr
 from
     dsm_changelog l
     join changeset_tree s on l.CHANGESET_UUID=s.uuid
+where
+  l.TABLE_NAME='${tableName.toUpperCase()}' and l.COLUMN_NAME in (
+#foreach( $column in $columns )
+#if( $foreach.count > 1 )    ,#{else}     #end'${column.toUpperCase()}'
+#end
+  )
 #if(! $is_hsql )
 ),
 #else
@@ -191,12 +198,6 @@ mut as (
 #end
 	from
 	  CHANGELOG_ROW_V l
-	where
-	  l.TABLE_NAME='${tableName.toUpperCase()}' and l.COLUMN_NAME in (
-#foreach( $column in $columns )
-#if( $foreach.count > 1 )       ,#{else}        #end'${column.toUpperCase()}'
-#end
-      )
 ),
 tml as (
   select
@@ -231,6 +232,18 @@ tml as (
   from
     mut m
 )
+, tml_ranked as (
+  select
+      o_tml.*,
+      o_cl.CHANGESET_UUID,
+      row_number() over (
+          partition by o_tml.UUID, o_cl.CHANGESET_UUID
+          order by o_tml.EFFECTIVE_TIMESTAMP_FROM desc nulls last, o_tml.ROW_NR desc
+      ) as rn_latest_in_changeset
+  from
+      tml o_tml
+      left join DSM_CHANGELOG o_cl on o_tml.TML_UUID=o_cl.UUID
+)
 #if(! $is_hsql )
 , ${viewName}_base as (
 #end
@@ -245,14 +258,11 @@ tml as (
 #foreach( $column in $columns )
 		coalesce(${column}, (select ${column} from tml where UUID=o_tml.UUID and (EFFECTIVE_TIMESTAMP_FROM is null or EFFECTIVE_TIMESTAMP_FROM<=o_tml.EFFECTIVE_TIMESTAMP_FROM) and ${column} is not null order by EFFECTIVE_TIMESTAMP_FROM desc nulls last limit 1)) ${column},
 #end
+        o_tml.rn_latest_in_changeset,
         o_tml.EFFECTIVE_TIMESTAMP_FROM
 	from
-		tml o_tml
-	    left join DSM_CHANGELOG o_cl on o_tml.TML_UUID=o_cl.UUID
-    where o_tml.EFFECTIVE_TIMESTAMP_FROM is null or (
-            o_tml.EFFECTIVE_TIMESTAMP_FROM = (select max(EFFECTIVE_TIMESTAMP_FROM) from tml left join DSM_CHANGELOG cl on tml.TML_UUID=cl.UUID where tml.UUID=o_tml.UUID and cl.CHANGESET_UUID=o_cl.CHANGESET_UUID)
-            and o_tml.ROW_NR = (select max(ROW_NR) from tml left join DSM_CHANGELOG cl on tml.TML_UUID=cl.UUID where tml.UUID=o_tml.UUID and cl.CHANGESET_UUID=o_cl.CHANGESET_UUID and o_tml.EFFECTIVE_TIMESTAMP_FROM=tml.EFFECTIVE_TIMESTAMP_FROM)
-        )
+		tml_ranked o_tml
+    where o_tml.EFFECTIVE_TIMESTAMP_FROM is null or o_tml.rn_latest_in_changeset=1
 #if(! $is_hsql )
 )
 #else
@@ -277,7 +287,8 @@ select
 #end
 #end
   EFFECTIVE_TIMESTAMP_FROM,
-  (select min(EFFECTIVE_TIMESTAMP_FROM) from ${viewName}_base where UUID=tml.UUID and (tml.EFFECTIVE_TIMESTAMP_FROM is null or EFFECTIVE_TIMESTAMP_FROM>tml.EFFECTIVE_TIMESTAMP_FROM)) as EFFECTIVE_TIMESTAMP_TO
+  (select min(EFFECTIVE_TIMESTAMP_FROM) from ${viewName}_base where UUID=tml.UUID and (tml.EFFECTIVE_TIMESTAMP_FROM is null or EFFECTIVE_TIMESTAMP_FROM>tml.EFFECTIVE_TIMESTAMP_FROM)) as EFFECTIVE_TIMESTAMP_TO,
+  rn_latest_in_changeset
 from ${viewName}_base tml
 where TML_PHASE<>'T'
 ;
