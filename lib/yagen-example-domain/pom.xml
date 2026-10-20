@@ -194,6 +194,10 @@
                 <version>2.12.4</version>
                 <configuration>
                     <forkMode>always</forkMode>
+                    <systemPropertyVariables>
+                        <!-- hsqldb >= 2.7.1 only allows java routines of whitelisted classes (used by InitDB.ddl.sql) -->
+                        <hsqldb.method_class_names>com.github.gekoh.yagen.util.*</hsqldb.method_class_names>
+                    </systemPropertyVariables>
                 </configuration>
             </plugin>
         </plugins>

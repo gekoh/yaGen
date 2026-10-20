@@ -137,6 +137,9 @@ public class CreateDDL {
     private static final int COL_PATTERN_IDX_UNIQUE_CONS_NAME = 41;
     private static final String COL_PATTERN_IDX_CHECK  = "check";
     private static final String COL_PATTERN_IDX_CHECK_NAME  = "checkName";
+    private static final String HSQLDB_JSON_COLUMN_TYPE = "clob";
+    // column definition is "<name> <type> ..." following the opening bracket or a comma
+    private static final Pattern HSQLDB_JSON_COLUMN_TYPE_PATTERN = Pattern.compile("(?i)([(,]\\s*[^\\s,()]+\\s+)jsonb?\\b");
     private static final Pattern COL_PATTERN = Pattern.compile("([\\(|\\s]?)(" + REGEX_COLNAME + ")([\\s]((varchar(2)?\\([^\\)]+\\))|(number\\([^\\)]+\\))|(numeric\\([^\\)]+\\))|(timestamp(\\s*\\([0-9]+\\))?( with(out)? time zone)?)|(date)|([cb]lob)|(text)|(char\\([^\\)]+\\))|(int((eger)|[0-9]*))|(smallint)|(bigint)|(bit)|(json(b)?)|(bool(ean)?)|(((double)|(float[0-9]?(\\s*\\([0-9]+\\))?))( precision)?)))([\\s]+default[\\s]*([^\\s]*))?(([\\s]+constraint[\\s]+([a-zA-Z]+[0-9a-zA-Z_]*))?([\\s]+not)?[\\s]+null)?" +
             "(([\\s]+constraint[\\s]+([a-zA-Z]+[0-9a-zA-Z_]*))?[\\s]+unique)?" +
             "(?<" + COL_PATTERN_IDX_CHECK + ">([\\s]+constraint[\\s]+(?<" + COL_PATTERN_IDX_CHECK_NAME + ">[a-zA-Z]+[0-9a-zA-Z_]*))?[\\s]+check[\\s]+\\(([^\\()]+\\([^\\)]+\\))*\\))?" +
@@ -435,6 +438,9 @@ public class CreateDDL {
         }
 
         String sqlCreate = buf.toString();
+        if (isHsqlDb(dialect)) {
+            sqlCreate = mapJsonColumnTypesForHsqlDb(sqlCreate);
+        }
         buf = new StringBuffer();
         String liveTableName = nameLC;
         Set<String> columnNames = columns;
@@ -709,6 +715,13 @@ public class CreateDDL {
         }
 
         return blobCols;
+    }
+
+    /**
+     * hsqldb has no json(b) column type, hibernate emits it when given as columnDefinition (e.g. for postgres), thus map it to clob
+     */
+    private String mapJsonColumnTypesForHsqlDb(String sqlCreate) {
+        return HSQLDB_JSON_COLUMN_TYPE_PATTERN.matcher(sqlCreate).replaceAll("$1" + HSQLDB_JSON_COLUMN_TYPE);
     }
 
     private String handleLayeredTable(String sqlCreate, LayeredTablesView layeredTablesView, Dialect dialect, Set<String> columnNames, Map<String, Column> columnMap) {
